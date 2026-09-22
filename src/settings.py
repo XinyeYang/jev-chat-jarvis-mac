@@ -44,7 +44,7 @@ class SettingsController(NSObject):
         restart_box.setFillColor_(A.NSColor.colorWithCalibratedRed_green_blue_alpha_(1, 0.94, 0.82, 1))
         view.addSubview_(restart_box)
         restart_notice = self.label(view, "保存后请退出应用并重启",
-                                    36, 518, 686, 22, 15)
+                                    36, 515.5, 686, 22, 15)
         restart_notice.setFont_(A.NSFont.boldSystemFontOfSize_(15))
         restart_notice.setTextColor_(A.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.55, 0.25, 0.02, 1))
         self.label(view, "编辑文件：" + str(self.path).replace(str(Path.home()), "~"),
