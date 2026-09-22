@@ -530,6 +530,7 @@ class HudController(NSObject):
             ("暂停读屏", "togglePause:", ""),
             ("YOLO 检测框", "toggleBoxes:", ""),
             ("立即重新分析", "reanalyze:", ""),
+            ("模型设置…", "openSettings:", ","),
         ):
             menu.addItemWithTitle_action_keyEquivalent_(title, action, key)
         menu.addItem_(AppKit.NSMenuItem.separatorItem())
@@ -541,6 +542,19 @@ class HudController(NSObject):
         self.boxes_item.setState_(
             AppKit.NSOnState if self._show_boxes else AppKit.NSOffState)
         self.status_item.setMenu_(menu)
+
+    def openSettings_(self, sender):
+        from settings import SettingsController
+        if getattr(self, "settings_controller", None) and self.settings_controller.window.isVisible():
+            self.settings_controller.show()
+            return
+        try:
+            self.settings_controller = SettingsController.alloc().init().build()
+            self.settings_controller.show()
+        except OSError:
+            alert = AppKit.NSAlert.alloc().init()
+            alert.setMessageText_("无法读取配置文件，请检查文件权限。")
+            alert.runModal()
 
     @objc.python_method
     def _make_label(self, x, y, w, h, size=13, color=None, bold=False):
