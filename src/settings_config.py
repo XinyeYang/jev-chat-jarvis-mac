@@ -106,8 +106,11 @@ def list_models(prefix: str, base: str, key: str) -> list[str]:
             data = json.loads(resp.read())
         finally:
             conn.close()
-        offered.extend(m["id"] for m in data.get("data", [])
-                       if isinstance(m, dict) and isinstance(m.get("id"), str) and m["id"])
+        # TypeSafe documents {models: [{name, description, release_date}]};
+        # OpenAI/Anthropic use {data: [{id, ...}]}. Do not guess alternate schemas.
+        collection, field = ("models", "name") if prefix == "TYPESAFE" else ("data", "id")
+        offered.extend(m[field] for m in data.get(collection, [])
+                       if isinstance(m, dict) and isinstance(m.get(field), str) and m[field])
         if api != "anthropic" or not data.get("has_more"):
             break
         next_id = data.get("last_id")

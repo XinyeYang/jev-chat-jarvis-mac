@@ -46,6 +46,15 @@ try:
         userconfig.load()
         c = SettingsController.alloc().init().build()
         c.show()
+        jev = c.fields['TYPESAFE']
+        jev['API_KEY'].setStringValue_('test-jev-key')
+        jev['BASE_URL'].setStringValue_(SettingsNetwork.base)
+        Server.response = {'models': [{'name': 'jev-latest'}, {'name': 'jev-preview'}]}
+        Server.code = 200
+        request_button(c, 'TYPESAFE', '获取模型列表').performClick_(None)
+        wait_for_request(c)
+        assert jev['MODEL'].objectValues() == ['jev-latest', 'jev-preview']
+        assert jev['API_KEY'].stringValue() == 'test-jev-key'
         fields = c.fields['OPENAI']
         fields['API_KEY'].setStringValue_('test-only-key')
         fields['BASE_URL'].setStringValue_(SettingsNetwork.base + '/v1')

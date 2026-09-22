@@ -120,6 +120,16 @@ class SettingsNetwork(unittest.TestCase):
         self.assertEqual(Server.requests[0][0], '/gateway/v4/models')
         self.assertEqual(Server.requests[0][1]['authorization'], 'Bearer draft-key')
 
+    def test_jev_models_follow_typesafe_schema(self):
+        Server.response = {'models': [
+            {'name': 'jev-latest', 'description': 'Stable', 'release_date': '2026-09-15'},
+            {'name': 'jev-preview', 'description': 'Preview', 'release_date': '2026-09-15'},
+        ]}
+        self.assertEqual(config.list_models('TYPESAFE', self.base, 'draft-key'),
+                         ['jev-latest', 'jev-preview'])
+        self.assertEqual(Server.requests[0][0], '/v1/models')
+        self.assertEqual(Server.requests[0][1]['authorization'], 'Bearer draft-key')
+
     def test_anthropic_models_headers(self):
         Server.response = {'data': [{'id': 'model'}]}
         config.list_models('ANTHROPIC', self.base, 'draft-key')
