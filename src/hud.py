@@ -323,11 +323,18 @@ class HudController(NSObject):
         # "意图识别率 100%" measures 103 px at 12 pt.
         # Every control is created once and then placed by _relayout(), which is what lets
         # the panel change height when the tone selection changes.
-        self.settings_button = self._make_button(PANEL_W - 74, 0, 60, 26,
-                                                 "设置", "openSettings:", 0)
+        self.settings_button = self._make_button(PANEL_W - 42, 0, 28, 28,
+                                                 "", "openSettings:", 0)
+        self.settings_button.setImage_(AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+            "gearshape", "模型设置"))
+        self.settings_button.setImagePosition_(AppKit.NSImageOnly)
+        self.settings_button.setBordered_(False)
+        self.settings_button.setContentTintColor_(PALETTE["muted"])
+        self.settings_button.setToolTip_("模型设置")
+        self.settings_button.setAccessibilityLabel_("模型设置")
         self.settings_button.setHidden_(False)
         view.addSubview_(self.settings_button)
-        self._fixed.append((self.settings_button, PANEL_W - 74, 25, 60, 26))
+        self._fixed.append((self.settings_button, PANEL_W - 42, 24, 28, 28))
         dy = 30
         for key, size, color, bold, height in (
             ("chat", 12, PALETTE["green"], True, 18),      # 群名 / 联系人
@@ -339,7 +346,7 @@ class HudController(NSObject):
             ("risk", 14, PALETTE["green"], True, 20),
             ("actions", 13, PALETTE["text"], False, 18),
         ):
-            width = PANEL_W - 102 if key == "chat" else PANEL_W - 28
+            width = PANEL_W - 68 if key == "chat" else PANEL_W - 28
             tf = self._make_label(14, 0, width, height,
                                   size=size, color=color, bold=bold)
             if key == "message":

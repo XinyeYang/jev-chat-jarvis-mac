@@ -31,11 +31,22 @@ class SettingsController(NSObject):
             A.NSBackingStoreBuffered, False)
         self.window.setAppearance_(A.NSAppearance.appearanceNamed_(A.NSAppearanceNameAqua))
         self.window.setTitle_("模型设置 · 保存后重启生效")
+        # The HUD and OCR overlay float above normal windows; settings must sit above both.
+        self.window.setLevel_(A.NSFloatingWindowLevel + 1)
         self.window.setReleasedWhenClosed_(False)
         self.window.setDelegate_(self)
         view = self.window.contentView()
         self.label(view, "模型设置", 24, 548, 710, 30, 22)
-        self.label(view, "保存不会切换当前服务；请退出并重新打开 jev-jarvis。", 24, 514, 710, 26)
+        restart_box = A.NSBox.alloc().initWithFrame_(NSMakeRect(24, 512, 710, 32))
+        restart_box.setBoxType_(A.NSBoxCustom)
+        restart_box.setBorderType_(A.NSNoBorder)
+        restart_box.setCornerRadius_(5)
+        restart_box.setFillColor_(A.NSColor.colorWithCalibratedRed_green_blue_alpha_(1, 0.94, 0.82, 1))
+        view.addSubview_(restart_box)
+        restart_notice = self.label(view, "保存后请退出应用并重启",
+                                    36, 518, 686, 22, 15)
+        restart_notice.setFont_(A.NSFont.boldSystemFontOfSize_(15))
+        restart_notice.setTextColor_(A.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.55, 0.25, 0.02, 1))
         self.label(view, "编辑文件：" + str(self.path).replace(str(Path.home()), "~"),
                    24, 476, 710, 34, 12)
         self.tabs = A.NSTabView.alloc().initWithFrame_(NSMakeRect(16, 130, 728, 342))
