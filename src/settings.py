@@ -63,6 +63,7 @@ class SettingsController(NSObject):
                                                if "$(" in values.get(f"{prefix}_{name}", "") or "`" in values.get(f"{prefix}_{name}", "")
                                                else "仅显示此文件中的密钥；不会复制环境变量中的密钥")
                 if name == "MODEL":
+                    self.set_models(field, [])
                     field.setCompletes_(False)
                     field.setPlaceholderString_("获取模型列表后选择，或手动填写模型名称")
                 panel.addSubview_(field)
@@ -84,10 +85,38 @@ class SettingsController(NSObject):
         self.label(view, self.current_source(), 24, 130, 710, 54, 12)
         self.label(view, "优先级：环境变量 > 用户 env > 项目 .env > 内置；两组生成密钥同时存在时 OpenAI 优先。\n清空此文件的密钥不屏蔽其他来源；切换服务需清除原来源中的优先密钥。", 24, 82, 710, 44, 12)
         self.status = self.label(view, "测试会发送固定问候语，不读取微信内容；可能产生少量服务费用。", 24, 36, 535, 42, 12)
+        self.set_status(self.status.stringValue())
         self.save_button = self.button(view, "保存配置", "saveSettings:", 602, 38, 134)
         self.controls.append(self.save_button)
         self.window.center()
         return self
+
+    @objc.python_method
+    def set_status(self, text, kind="info"):
+        colors = {"info": A.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.10, 0.32, 0.70, 1),
+                  "success": A.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.0, 0.40, 0.20, 1),
+                  "error": A.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.75, 0.12, 0.12, 1)}
+        self.status.setStringValue_(text)
+        self.status.setTextColor_(colors[kind])
+        self.status.setFont_(A.NSFont.boldSystemFontOfSize_(13))
+
+    @objc.python_method
+    def set_models(self, combo, models):
+        current = combo.stringValue()
+        combo.removeAllItems()
+        combo.addItemsWithObjectValues_(models or ["暂无"])
+        combo.setStringValue_(current)
+
+    def comboBoxWillPopUp_(self, notification):
+        self.model_before_popup = notification.object().stringValue()
+
+    def comboBoxSelectionDidChange_(self, notification):
+        combo = notification.object()
+        if list(combo.objectValues()) == ["暂无"]:
+            combo.deselectItemAtIndex_(0)
+            combo.setStringValue_(getattr(self, "model_before_popup", ""))
+        else:
+            self.set_status("模型已修改，请重新测试；保存后重启生效。")
 
     @objc.python_method
     def current_source(self):
@@ -137,16 +166,14 @@ class SettingsController(NSObject):
         for fields in self.fields.values():
             if field in (fields["API_KEY"], fields["BASE_URL"]):
                 combo = fields["MODEL"]
-                current = combo.stringValue()
-                combo.removeAllItems()
-                combo.setStringValue_(current)
-        self.status.setStringValue_("配置已修改，请重新测试；保存后重启生效。")
+                self.set_models(combo, [])
+        self.set_status("配置已修改，请重新测试；保存后重启生效。")
 
     def saveSettings_(self, sender):
         self.window.makeFirstResponder_(None)
         changes = self.changed()
         if not changes:
-            self.status.setStringValue_("没有需要保存的修改。")
+            self.set_status("没有需要保存的修改。")
             return
         # Persist missing displayed defaults for edited services, but keep untouched key lines.
         for prefix in config.PREFIXES:
@@ -164,14 +191,14 @@ class SettingsController(NSObject):
                     config.validate_endpoint(value)
             self.original = config.write_settings(self.path, self.original, changes)
         except ValueError as e:
-            self.status.setStringValue_(str(e))
+            self.set_status(str(e), "error")
             return
         except OSError:
-            self.status.setStringValue_("保存失败：请检查文件权限及可用磁盘空间。")
+            self.set_status("保存失败：请检查文件权限及可用磁盘空间。", "error")
             return
         self.initial.update(changes)
         self.file_values.update(changes)
-        self.status.setStringValue_("已保存。请退出并重新打开应用；当前会话继续使用启动时的配置。")
+        self.set_status("已保存。请退出并重新打开应用；当前会话继续使用启动时的配置。", "success")
 
     def fetchModels_(self, sender):
         self.start_request(sender.tag(), True)
@@ -200,19 +227,18 @@ class SettingsController(NSObject):
                 if not isinstance(extra, dict):
                     raise ValueError("OPENAI_EXTRA_BODY 必须是 JSON 对象。")
         except json.JSONDecodeError:
-            self.status.setStringValue_("OPENAI_EXTRA_BODY 不是有效 JSON，请先修正该配置。")
+            self.set_status("OPENAI_EXTRA_BODY 不是有效 JSON，请先修正该配置。", "error")
             return
         except ValueError as e:
-            self.status.setStringValue_(str(e))
+            self.set_status(str(e), "error")
             return
         if listing:
             combo = self.fields[prefix]["MODEL"]
-            combo.removeAllItems()
-            combo.setStringValue_(values["MODEL"])
+            self.set_models(combo, [])
         self.busy = True
         for control in self.controls:
             control.setEnabled_(False)
-        self.status.setStringValue_("正在获取模型列表…" if listing else "正在测试所填服务与模型…")
+        self.set_status("正在获取模型列表…" if listing else "正在测试所填服务与模型…")
 
         def work():
             result = {"index": index, "listing": listing}
@@ -232,20 +258,17 @@ class SettingsController(NSObject):
         for control in self.controls:
             control.setEnabled_(True)
         if result.get("error"):
-            self.status.setStringValue_(result["error"] + (" 模型仍可手填。" if result["listing"] else ""))
+            self.set_status(result["error"] + (" 模型仍可手填。" if result["listing"] else ""), "error")
         elif result["listing"]:
             combo = self.fields[config.PREFIXES[result["index"]]]["MODEL"]
-            current = combo.stringValue()
-            combo.removeAllItems()
-            combo.addItemsWithObjectValues_(result["models"])
-            combo.setStringValue_(current)
-            self.status.setStringValue_(f"已获取 {len(result['models'])} 个模型。请从下拉列表选择或手填，再测试连接。")
+            self.set_models(combo, result["models"])
+            self.set_status(f"已获取 {len(result['models'])} 个模型。请从下拉列表选择或手填，再测试连接。", "success")
         else:
-            self.status.setStringValue_("连接成功：所填服务与模型返回了有效结果。配置尚需保存并重启生效。")
+            self.set_status("连接成功：所填服务与模型返回了有效结果。配置尚需保存并重启生效。", "success")
 
     def windowShouldClose_(self, sender):
         if self.busy:
-            self.status.setStringValue_("请求进行中，请等待结果后关闭。")
+            self.set_status("请求进行中，请等待结果后关闭。")
             return False
         if self.changed():
             alert = A.NSAlert.alloc().init()
