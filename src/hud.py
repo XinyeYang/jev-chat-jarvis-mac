@@ -323,6 +323,11 @@ class HudController(NSObject):
         # "意图识别率 100%" measures 103 px at 12 pt.
         # Every control is created once and then placed by _relayout(), which is what lets
         # the panel change height when the tone selection changes.
+        self.settings_button = self._make_button(PANEL_W - 74, 0, 60, 26,
+                                                 "设置", "openSettings:", 0)
+        self.settings_button.setHidden_(False)
+        view.addSubview_(self.settings_button)
+        self._fixed.append((self.settings_button, PANEL_W - 74, 25, 60, 26))
         dy = 30
         for key, size, color, bold, height in (
             ("chat", 12, PALETTE["green"], True, 18),      # 群名 / 联系人
@@ -334,13 +339,14 @@ class HudController(NSObject):
             ("risk", 14, PALETTE["green"], True, 20),
             ("actions", 13, PALETTE["text"], False, 18),
         ):
-            tf = self._make_label(14, 0, PANEL_W - 28, height,
+            width = PANEL_W - 102 if key == "chat" else PANEL_W - 28
+            tf = self._make_label(14, 0, width, height,
                                   size=size, color=color, bold=bold)
             if key == "message":
                 tf.cell().setWraps_(True)
             view.addSubview_(tf)
             self.rows[key] = tf
-            self._fixed.append((tf, 14, dy, PANEL_W - 28, height))
+            self._fixed.append((tf, 14, dy, width, height))
             dy += height + 8
 
         # ---- candidates section

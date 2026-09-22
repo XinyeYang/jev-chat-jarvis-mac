@@ -38,12 +38,17 @@ class SettingsController(NSObject):
         self.label(view, "保存不会切换当前服务；请退出并重新打开 jev-jarvis。", 24, 514, 710, 26)
         self.label(view, "编辑文件：" + str(self.path).replace(str(Path.home()), "~"),
                    24, 476, 710, 34, 12)
-        self.tabs = A.NSTabView.alloc().initWithFrame_(NSMakeRect(16, 192, 728, 280))
+        self.tabs = A.NSTabView.alloc().initWithFrame_(NSMakeRect(16, 130, 728, 342))
         titles = ("判断 · Jev", "生成 · OpenAI 兼容", "生成 · Anthropic 兼容")
         for index, (prefix, title) in enumerate(zip(config.PREFIXES, titles)):
             item = A.NSTabViewItem.alloc().initWithIdentifier_(prefix)
             item.setLabel_(title)
-            panel = A.NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 690, 238))
+            panel = A.NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 690, 300))
+            summary, source = self.current_source(prefix)
+            badge = self.label(panel, summary, 14, 260, 666, 26, 14)
+            badge.setFont_(A.NSFont.boldSystemFontOfSize_(14))
+            badge.setTextColor_(A.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.10, 0.32, 0.70, 1))
+            self.label(panel, source, 14, 206, 666, 48, 12)
             fields = {}
             for name, label, y in (("API_KEY", "密钥", 172), ("BASE_URL", "服务地址", 128), ("MODEL", "模型", 84)):
                 self.label(panel, label, 14, y, 88, 26)
@@ -82,7 +87,6 @@ class SettingsController(NSObject):
             item.setView_(panel)
             self.tabs.addTabViewItem_(item)
         view.addSubview_(self.tabs)
-        self.label(view, self.current_source(), 24, 130, 710, 54, 12)
         self.label(view, "优先级：环境变量 > 用户 env > 项目 .env > 内置；两组生成密钥同时存在时 OpenAI 优先。\n清空此文件的密钥不屏蔽其他来源；切换服务需清除原来源中的优先密钥。", 24, 82, 710, 44, 12)
         self.status = self.label(view, "测试会发送固定问候语，不读取微信内容；可能产生少量服务费用。", 24, 36, 535, 42, 12)
         self.set_status(self.status.stringValue())
@@ -119,15 +123,27 @@ class SettingsController(NSObject):
             self.set_status("模型已修改，请重新测试；保存后重启生效。")
 
     @objc.python_method
-    def current_source(self):
-        jev = userconfig.source_of("TYPESAFE_API_KEY", "JEV_API_KEY")
-        judge = "本地判断" if jev == "none" else "自己的 Jev 密钥（" + jev + "）"
-        oai = userconfig.provider("OPENAI")
-        anth = userconfig.provider("ANTHROPIC")
-        selected = oai if oai["key"] else anth
-        gen = ("自己的密钥（" + selected["source"] + "）" if selected["key"]
-               else "内置共享密钥" if builtin.API_KEY else "未配置")
-        return ("本次启动 · 判断：" + judge + "\n生成：" + gen).replace(str(Path.home()), "~")
+    def current_source(self, prefix):
+        if prefix == "TYPESAFE":
+            source = userconfig.source_of("TYPESAFE_API_KEY", "JEV_API_KEY")
+            summary = ("本次启动：正在使用自己的 Jev 密钥" if source != "none"
+                       else "本次启动：正在使用本地判断模型，未使用 Jev 密钥")
+        else:
+            oai = userconfig.provider("OPENAI")
+            anth = userconfig.provider("ANTHROPIC")
+            selected = "OPENAI" if oai["key"] else "ANTHROPIC" if anth["key"] else None
+            if selected:
+                name = "OpenAI 兼容" if selected == "OPENAI" else "Anthropic 兼容"
+                summary = "本次启动：正在使用自己的密钥（" + name + "）"
+                source = (oai if selected == "OPENAI" else anth)["source"]
+                if selected != prefix:
+                    source += "；本页服务当前未启用"
+            else:
+                summary = ("本次启动：正在使用内置共享密钥" if builtin.API_KEY
+                           else "本次启动：未配置生成密钥")
+                source = "应用内置" if builtin.API_KEY else "none"
+        detail = "来源：" + source.replace(str(Path.home()), "~") + "\n以下编辑内容保存后，需重启应用才会生效。"
+        return summary, detail
 
     @objc.python_method
     def label(self, view, text, x, y, w, h, size=13):
