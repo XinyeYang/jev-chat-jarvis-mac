@@ -21,14 +21,24 @@ class SelectionView(A.NSView):
             self.bounds(), NSMakeRect(0,0,0,0), A.NSCompositingOperationSourceOver, 1., True, None)
         A.NSColor.colorWithWhite_alpha_(0.,.30).set()
         mask = A.NSBezierPath.bezierPathWithRect_(self.bounds())
-        if self.selection:
-            mask.appendBezierPathWithRect_(NSMakeRect(*self.selection))
-            mask.setWindingRule_(A.NSEvenOddWindingRule)
+        regions=dict(self.owner.regions)
+        regions[self.owner.mode]=self.selection
+        for selection in regions.values():
+            if selection:mask.appendBezierPathWithRect_(NSMakeRect(*selection))
+        mask.setWindingRule_(A.NSEvenOddWindingRule)
         mask.fill()
-        if self.selection:
-            ui_style.PALETTE["green"].set()
-            border = A.NSBezierPath.bezierPathWithRect_(NSMakeRect(*self.selection))
-            border.setLineWidth_(2); border.stroke()
+        for key,selection in regions.items():
+            if not selection:continue
+            color=ui_style.PALETTE['green'] if key=='messages' else ui_style.rgb(0x2878CD)
+            color.set()
+            border=A.NSBezierPath.bezierPathWithRect_(NSMakeRect(*selection))
+            border.setLineWidth_(2.5 if key==self.owner.mode else 1.5);border.stroke()
+            label='消息识别区域' if key=='messages' else '输入区域'
+            A.NSString.stringWithString_(label).drawAtPoint_withAttributes_(
+                (selection[0]+4,selection[1]+4),
+                {A.NSFontAttributeName:A.NSFont.boldSystemFontOfSize_(11),
+                 A.NSForegroundColorAttributeName:color,
+                 A.NSBackgroundColorAttributeName:A.NSColor.whiteColor()})
         for m in self.messages:
             r=NSMakeRect(m.x*self.bounds().size.width,m.y*self.bounds().size.height,
                          m.w*self.bounds().size.width,m.h*self.bounds().size.height)
@@ -74,9 +84,9 @@ class SelectionView(A.NSView):
 
 class CalibrationController(NSObject):
     @objc.python_method
-    def build(self, callback, saved='', image=None, win=None, mode='messages', message_region=None):
-        self.mode = mode
-        self.message_region = message_region
+    def build(self, callback, saved='', image=None, win=None, saved_input=''):
+        self.mode = 'messages'
+        self.regions = {'messages': None, 'input': None}
         self.callback=callback; self.busy=False; self.preview=None; self.closed=False
         self.win=win or find_wechat_window()
         if self.win is None: raise ValueError('请先打开微信聊天窗口。')
@@ -100,7 +110,7 @@ class CalibrationController(NSObject):
             NSMakeRect(0,0,width,height),A.NSWindowStyleMaskTitled|A.NSWindowStyleMaskClosable,
             A.NSBackingStoreBuffered,False)
         self.window.setReleasedWhenClosed_(False); self.window.setDelegate_(self)
-        title = '校准输入区域' if mode == 'input' else '校准消息区域'
+        title = '校准区域'
         self.window.setTitle_(title+' · 确认后立即生效')
         self.window.setLevel_(A.NSFloatingWindowLevel+1)
         self.window.setAppearance_(A.NSAppearance.appearanceNamed_(A.NSAppearanceNameAqua))
@@ -117,10 +127,18 @@ class CalibrationController(NSObject):
         view.layer().setBackgroundColor_(surface['bg'].CGColor())
         self.window.setContentView_(view)
         view.addSubview_(ui_style.make_label(title,24,height-52,width-48,30,22,bold=True))
-        instruction=('框选完整文字编辑区，排除表情、附件、语音和发送按钮。'
-                     if mode == 'input' else
-                     '框选双方头像、昵称和气泡；排除联系人列表、标题、公告和输入区。')
-        view.addSubview_(ui_style.make_label(instruction,24,height-80,width-48,20,12,palette['muted']))
+        self.selector=A.NSSegmentedControl.alloc().initWithFrame_(NSMakeRect(24,height-86,330,26))
+        self.selector.setSegmentCount_(2)
+        for index,label in enumerate(('消息识别区域 · 绿框','输入区域 · 蓝框')):
+            self.selector.setLabel_forSegment_(label,index)
+            self.selector.setWidth_forSegment_(165,index)
+        self.selector.setSelectedSegment_(0)
+        self.selector.setTarget_(self);self.selector.setAction_('regionChanged:')
+        self.selector.setAccessibilityLabel_('选择当前要调整的区域')
+        view.addSubview_(self.selector)
+        self.instruction=ui_style.make_label('消息区：包含双方头像与气泡，排除列表、标题、公告和输入区。',
+            24,height-112,width-48,20,12,palette['muted'])
+        view.addSubview_(self.instruction)
         card=ui_style.make_surface(12,surface['surface'],surface['edge'])
         card.setFrame_(NSMakeRect(16,116,width-32,ch+16));view.addSubview_(card)
         self.canvas=SelectionView.alloc().initWithFrame_(NSMakeRect((width-cw)/2,124,cw,ch))
@@ -128,19 +146,20 @@ class CalibrationController(NSObject):
         self.canvas.owner=self;self.canvas.selection=None;self.canvas.messages=[]
         self.canvas.setAccessibilityLabel_('微信窗口截图，拖动框选区域，拖动边缘调整')
         view.addSubview_(self.canvas)
-        if saved:
-            try:
-                c=Calibration.parse(saved)
-                if c.matches(self.win):self.canvas.selection=(c.x*scale,c.y*scale,c.width*scale,c.height*scale)
-            except (ValueError,TypeError):pass
+        for key,value in (('messages',saved),('input',saved_input)):
+            if value:
+                try:
+                    c=Calibration.parse(value)
+                    if c.matches(self.win):self.regions[key]=(c.x*scale,c.y*scale,c.width*scale,c.height*scale)
+                except (ValueError,TypeError):pass
+        self.canvas.selection=self.regions['messages']
         notice=ui_style.make_surface(10,palette['amber'].colorWithAlphaComponent_(.10),
                                     palette['amber'].colorWithAlphaComponent_(.18))
         notice.setFrame_(NSMakeRect(24,64,width-48,42));view.addSubview_(notice)
         self.status=ui_style.make_label('拖动框选后预览；调整窗口、分栏或输入区后请重新校准。',
             36,74,width-72,22,12,palette['accent'],bold=True)
         view.addSubview_(self.status)
-        hint=('仅在你点击「填入」时写入；有草稿则停止，不发送。' if mode=='input'
-              else '预览仅本地 OCR · 输入区需单独校准才能填入')
+        hint='两区一起保存 · 不发送消息、不清空草稿'
         view.addSubview_(ui_style.make_label(hint,24,18,width-400,30,11,palette['muted']))
         for title,action,x in [('取消','cancel:',width-364),('预览识别','preview:',width-248),('确认并启用','save:',width-132)]:
             button=A.NSButton.buttonWithTitle_target_action_(title,self,action)
@@ -150,11 +169,23 @@ class CalibrationController(NSObject):
             if action=='save:':self.save_button=button;button.setEnabled_(False);button.setKeyEquivalent_('\r')
             if action=='preview:':
                 self.preview_button=button
-                if mode=='input':button.setTitle_('预览选区')
+
             if action=='cancel:':button.setKeyEquivalent_('\x1b')
         self.window.center();self.window.makeKeyAndOrderFront_(None)
         A.NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         return self
+
+    def regionChanged_(self, sender):
+        if self.busy:
+            self.selector.setSelectedSegment_(0 if self.mode=='messages' else 1)
+            return
+        self.regions[self.mode]=self.canvas.selection
+        self.mode='messages' if self.selector.selectedSegment()==0 else 'input'
+        self.canvas.selection=self.regions[self.mode]
+        self.instruction.setStringValue_(
+            '消息区：包含双方头像与气泡，排除列表、标题、公告和输入区。' if self.mode=='messages'
+            else '输入区：框选完整文字编辑区，排除底部工具栏和发送按钮。')
+        self.canvas.setNeedsDisplay_(True)
 
     @objc.python_method
     def invalidate(self):
@@ -163,25 +194,28 @@ class CalibrationController(NSObject):
 
     @objc.python_method
     def selection(self):
-        if not self.canvas.selection: raise ValueError('请先拖动框选消息区域。')
+        if not self.canvas.selection: raise ValueError('请先框选当前区域。')
         scale=self.canvas.bounds().size.width/self.win.w
         return Calibration(self.win.w,self.win.h,*(v/scale for v in self.canvas.selection))
 
     def preview_(self,sender):
         if self.busy:return
         try:
-            c=self.selection()
-            if self.mode=='input':validate_input_region(self.message_region,c)
+            self.regions[self.mode]=self.canvas.selection
+            if not all(self.regions.values()):
+                raise ValueError('请分别框选消息区和输入区，再一起预览。')
+            scale=self.canvas.bounds().size.width/self.win.w
+            message, editor = (Calibration(self.win.w,self.win.h,*(v/scale for v in self.regions[k]))
+                               for k in ('messages','input'))
+            validate_input_region(message,editor)
+            c=(message,editor)
         except ValueError as e:self.status.setStringValue_(str(e));return
         self.busy=True;self.save_button.setEnabled_(False);self.preview_button.setEnabled_(False)
-        self.status.setStringValue_('正在检查选区…' if self.mode=='input' else '正在本地识别，请稍候…')
+        self.status.setStringValue_('正在预览消息识别并检查输入区，请稍候…')
         def run():
             try:
                 win=dict(wid=self.win.wid,w=self.win.w,h=self.win.h,x=self.win.x,y=self.win.y,title=self.win.title)
-                if self.mode=='input':
-                    res={'messages':[]}
-                else:
-                    res=read_calibrated(self.image,c,win,100)
+                res=read_calibrated(self.image,c[0],win,100)
                 result=(c,res,None)
             except Exception as e:result=(c,None,type(e).__name__)
             self.performSelectorOnMainThread_withObject_waitUntilDone_('previewDone:',result,False)
@@ -195,17 +229,17 @@ class CalibrationController(NSObject):
         self.preview=c;self.canvas.messages=res['messages'];self.canvas.setNeedsDisplay_(True)
         counts={s:sum(m.side==s for m in res['messages']) for s in ('them','me','unknown')}
         self.status.setStringValue_(f"预览：对方 {counts['them']} · 我 {counts['me']} · 未确认 {counts['unknown']}。确认选区后启用；未确认不自动回复。")
-        if self.mode=='input':
-            self.status.setStringValue_('请确认覆盖整个编辑区且不含工具栏；不会清空草稿或发送消息。')
+
         self.save_button.setEnabled_(True)
 
     def save_(self,sender):
         if self.preview is None or self.busy:return
         current=find_wechat_window(self.win.wid)
-        if current is None or current.wid!=self.win.wid or not self.preview.matches(current):
+        if current is None or current.wid!=self.win.wid or not self.preview[0].matches(current):
             self.status.setStringValue_('微信窗口已改变，请取消后重新校准。');return
         try:
-            write_settings(self.path,self.original,{('JEV_INPUT_REGION' if self.mode=='input' else 'JEV_MESSAGE_REGION'):self.preview.serialize()})
+            write_settings(self.path,self.original,{'JEV_MESSAGE_REGION':self.preview[0].serialize(),
+                                                     'JEV_INPUT_REGION':self.preview[1].serialize()})
         except (ValueError,OSError) as e:self.status.setStringValue_(str(e));return
         self.callback(self.preview,self.win.wid);self.closed=True;self.window.close()
 

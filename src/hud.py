@@ -351,6 +351,23 @@ class HudController(NSObject):
         view.addSubview_(self.settings_button)
         self._fixed.append((self.settings_button, PANEL_W - 44, 4, 32, 32))
 
+        self.calibration_button = self._make_button(PANEL_W - 80, 0, 32, 32,
+                                                    "", "calibrateMessages:", 0)
+        icon = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+            "viewfinder", "校准消息区和输入区")
+        self.calibration_button.setImage_(icon.imageWithSymbolConfiguration_(symbol_config))
+        self.calibration_button.setImagePosition_(AppKit.NSImageOnly)
+        self.calibration_button.setImageScaling_(AppKit.NSImageScaleNone)
+        self.calibration_button.setBordered_(False)
+        self.calibration_button.setContentTintColor_(PALETTE["muted"])
+        self.calibration_button.layer().setBackgroundColor_(NSColor.clearColor().CGColor())
+        self.calibration_button.layer().setBorderWidth_(0.0)
+        self.calibration_button.setToolTip_("校准消息区和输入区")
+        self.calibration_button.setAccessibilityLabel_("校准消息区和输入区")
+        self.calibration_button.setHidden_(False)
+        view.addSubview_(self.calibration_button)
+        self._fixed.append((self.calibration_button, PANEL_W - 80, 4, 32, 32))
+
         # Decorative surfaces are fixed; every string still comes from the existing rows.
         for surface, x, top, w, h in (
             (self._make_surface(12, PALETTE["surface"]), 14, 54, PANEL_W - 28, 62),
@@ -399,7 +416,7 @@ class HudController(NSObject):
             self._detail_views.append(label)
 
         for key, x, top, w, h, size, color, bold in (
-            ("chat", 20, 14, PANEL_W - 76, 20, 15, PALETTE["accent"], True),
+            ("chat", 20, 14, PANEL_W - 112, 20, 15, PALETTE["accent"], True),
             ("status", 20, 36, PANEL_W - 40, 14, 10, PALETTE["muted"], False),
             ("message", 22, 82, PANEL_W - 44, 38, 14, PALETTE["text"], False),
             ("sender", 22, 62, PANEL_W - 112, 14, 10, PALETTE["muted"], False),
@@ -697,8 +714,7 @@ class HudController(NSObject):
             ("YOLO 检测框", "toggleBoxes:", ""),
             ("立即重新分析", "reanalyze:", ""),
             ("模型设置…", "openSettings:", ","),
-            ("校准消息识别区域…", "calibrateMessages:", ""),
-            ("校准输入区域…", "calibrateInput:", ""),
+            ("校准区域…", "calibrateMessages:", ""),
             ("恢复自动识别区域", "clearCalibration:", ""),
         ):
             menu.addItemWithTitle_action_keyEquivalent_(title, action, key)
@@ -734,63 +750,28 @@ class HudController(NSObject):
         from calibration_ui import CalibrationController
         self._calibrating = True
         self._retire_calibration_results()
-        self.applyWaiting_("正在校准消息区域…")
+        self.applyWaiting_("正在校准消息区和输入区…")
         self.panel.orderOut_(None)
         self._ov_panel.orderOut_(None)
         try:
             self.calibration_controller = CalibrationController.alloc().init().build(
-                self._calibration_finished, self._calibration_saved)
+                self._calibration_finished, self._calibration_saved,
+                saved_input=self._input_calibration_saved)
         except (ValueError,OSError) as e:
             self._calibrating = False
             self._show()
             self._render("status", str(e), PALETTE["red"])
-
-    def calibrateInput_(self, sender):
-        if self._calibrating:
-            self.calibration_controller.window.makeKeyAndOrderFront_(None)
-            return
-        if self._calibration is None:
-            self._render("status", "请先确认消息区域，再校准输入区。", PALETTE["amber"])
-            return
-        from perception import find_wechat_window
-        win = find_wechat_window(self._calibration_wid)
-        if win is None or win.wid != self._calibration_wid or not self._calibration.matches(win):
-            self._render("status", "微信窗口已改变，请先重新校准消息区。", PALETTE["amber"])
-            return
-        from calibration_ui import CalibrationController
-        self._calibrating = True
-        self._retire_calibration_results()
-        self.applyWaiting_("正在校准输入区域…")
-        self.panel.orderOut_(None)
-        self._ov_panel.orderOut_(None)
-        try:
-            self.calibration_controller = CalibrationController.alloc().init().build(
-                self._input_calibration_finished, self._input_calibration_saved,
-                win=win, mode='input', message_region=self._calibration)
-        except (ValueError,OSError) as e:
-            self._calibrating = False
-            self._show()
-            self._render("status", str(e), PALETTE["red"])
-
-    @objc.python_method
-    def _input_calibration_finished(self, calibration, wid):
-        if calibration is not None:
-            self._input_calibration = calibration
-            self._input_calibration_wid = wid
-            self._input_calibration_saved = calibration.serialize()
-        self._calibrating = False
-        self._retire_calibration_results()
-        self.applyWaiting_("输入区已校准；点击填入时检查草稿，不发送。"
-                           if calibration else "已取消本次输入区校准")
 
     @objc.python_method
     def _calibration_finished(self, calibration, wid):
         if calibration is not None:
-            self._input_calibration = None
-            self._input_calibration_wid = None
-            self._calibration = calibration
+            message, editor = calibration
+            self._input_calibration = editor
+            self._input_calibration_wid = wid
+            self._input_calibration_saved = editor.serialize()
+            self._calibration = message
             self._calibration_wid = wid
-            self._calibration_saved = calibration.serialize()
+            self._calibration_saved = message.serialize()
             self._calibration_required = True
         self._calibrating = False
         self._retire_calibration_results()
@@ -868,7 +849,7 @@ class HudController(NSObject):
             if border is not None:
                 layer.setBorderColor_(border.CGColor())
         for button in self._appearance_buttons:
-            if button is self.settings_button:
+            if button is self.settings_button or button is self.calibration_button:
                 continue  # the gear stays an unboxed icon
             button.layer().setBackgroundColor_(adapted(PALETTE["row"]).CGColor())
             button.layer().setBorderColor_(adapted(PALETTE["edge"]).CGColor())
@@ -1165,7 +1146,7 @@ class HudController(NSObject):
     def fillCandidate_(self, sender):
         """Write the candidate into WeChat's input box (src/fill.py)."""
         if getattr(self,"_calibration_required",False) and self._input_calibration is None:
-            self._render("status", "请先从菜单栏校准输入区，或复制回复。", PALETTE["amber"])
+            self._render("status", "请点击右上角校准图标，确认消息区和输入区。", PALETTE["amber"])
             return
         idx = sender.tag()
         text = self.cand_texts[idx] if 0 <= idx < len(self.cand_texts) else None
@@ -1603,7 +1584,7 @@ class HudController(NSObject):
         if getattr(self, "_calibrating", False):
             return
         if getattr(self, "_calibration_required", False) and self._calibration is None:
-            self._push("applyWaiting:", "请从菜单栏确认或重新校准消息区域。")
+            self._push("applyWaiting:", "请点击右上角校准图标，确认消息区和输入区。")
             self._next_read_ts = time.time() + SLOW_TICK
             return
         capture_foreground_epoch = self._foreground_epoch
@@ -2429,7 +2410,7 @@ class HudController(NSObject):
         else:
             color = PALETTE["amber"]
             rect = NSMakeRect(12, 12, 0, 0)
-            label = ("输入框：请从菜单栏校准输入区" if getattr(self,"_calibration_required",False)
+            label = ("输入框：请点击右上角图标校准" if getattr(self,"_calibration_required",False)
                      else "输入框：" + (target["reason"] if target else "定位中…"))
         chip = NSAttributedString.alloc().initWithString_attributes_(label, {
             NSFontAttributeName: font, NSForegroundColorAttributeName: NSColor.whiteColor(),
