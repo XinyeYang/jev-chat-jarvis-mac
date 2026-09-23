@@ -96,6 +96,33 @@ class CalibrationTests(unittest.TestCase):
             ocr_image(canvas([]),region=(.65,.2,.3,.6))
         self.assertEqual(call.call_args.args[-1],(.65,.2,.3,.6))
 
+    def test_numeric_recovery_never_guesses_or_duplicates(self):
+        from calibrated_messages import recover_numeric_bubbles
+        image=canvas([(160,110,48,36,(.91,.91,.92))])
+        digit=TextBlock('1',.5,.2,.3,.25,.4)
+        with patch('perception.ocr_image',return_value=[digit]) as ocr:
+            recovered=recover_numeric_bubbles(image,[],(.2,.1,.75,.8))
+            self.assertEqual([b.text for b in recovered],['1'])
+            self.assertEqual(ocr.call_count,1)
+        known=[block('1',170,120,10)]
+        with patch('perception.ocr_image') as ocr:
+            self.assertEqual(recover_numeric_bubbles(image,known,(.2,.1,.75,.8)),known)
+            ocr.assert_not_called()
+        for text,confidence in [('I',1),('3',.3),('GPT3',1)]:
+            with patch('perception.ocr_image',return_value=[TextBlock(text,confidence,.2,.3,.25,.4)]):
+                self.assertEqual(recover_numeric_bubbles(image,[],(.2,.1,.75,.8)),[])
+
+    def test_input_selection_must_be_below_messages(self):
+        from calibration import validate_input_region
+        messages=Calibration(600,600,120,60,450,350)
+        editor=Calibration(600,600,125,420,440,100)
+        validate_input_region(messages,editor)
+        self.assertEqual(editor.screen_rect({'x':500,'y':200}),(625,620,440,100))
+        for wrong in [Calibration(600,600,125,400,440,100),
+                      Calibration(600,600,10,420,100,100)]:
+            with self.assertRaises(ValueError):validate_input_region(messages,wrong)
+
+
 class CalibrationHudTests(unittest.TestCase):
     def setUp(self):
         import test_hud_reply

@@ -35,3 +35,15 @@ class Calibration:
     def rect(self):
         return (self.x / self.window_width, self.y / self.window_height,
                 self.width / self.window_width, self.height / self.window_height)
+
+    def screen_rect(self, win):
+        return (win['x']+self.x, win['y']+self.y, self.width, self.height)
+
+
+def validate_input_region(messages, editor):
+    if (messages.window_width != editor.window_width
+            or messages.window_height != editor.window_height
+            or editor.y < messages.y+messages.height
+            or editor.x < messages.x-8
+            or editor.x+editor.width > messages.x+messages.width+8):
+        raise ValueError('输入区应位于消息区下方，并完整框选编辑区，不含工具栏。')

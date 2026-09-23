@@ -37,7 +37,7 @@ def write_settings(path: Path, original: str, changes: dict[str, str]) -> str:
         raise ValueError("配置文件已被其他程序修改，请关闭设置窗口后重新打开。")
     # JUDGE_BACKEND is the first-run dialog's choice (judge.download_block_reason);
     # the settings window's offline-model section writes it through the same guarded path.
-    allowed = {f"{p}_{f}" for p in PREFIXES for f in FIELDS} | {"JUDGE_BACKEND", "JEV_MESSAGE_REGION"}
+    allowed = {f"{p}_{f}" for p in PREFIXES for f in FIELDS} | {"JUDGE_BACKEND", "JEV_MESSAGE_REGION", "JEV_INPUT_REGION"}
     if not changes.keys() <= allowed:
         raise ValueError("不支持的配置项。")
     for value in changes.values():

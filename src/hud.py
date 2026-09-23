@@ -186,6 +186,9 @@ class HudController(NSObject):
         self = objc.super(HudController, self).init()
         if self is None:
             return None
+        self._input_calibration = None
+        self._input_calibration_wid = None
+        self._input_calibration_saved = userconfig.get("JEV_INPUT_REGION")
         self._calibration = None
         self._calibration_wid = None
         self._calibration_saved = userconfig.get("JEV_MESSAGE_REGION")
@@ -695,6 +698,7 @@ class HudController(NSObject):
             ("立即重新分析", "reanalyze:", ""),
             ("模型设置…", "openSettings:", ","),
             ("校准消息识别区域…", "calibrateMessages:", ""),
+            ("校准输入区域…", "calibrateInput:", ""),
             ("恢复自动识别区域", "clearCalibration:", ""),
         ):
             menu.addItemWithTitle_action_keyEquivalent_(title, action, key)
@@ -741,9 +745,49 @@ class HudController(NSObject):
             self._show()
             self._render("status", str(e), PALETTE["red"])
 
+    def calibrateInput_(self, sender):
+        if self._calibrating:
+            self.calibration_controller.window.makeKeyAndOrderFront_(None)
+            return
+        if self._calibration is None:
+            self._render("status", "请先确认消息区域，再校准输入区。", PALETTE["amber"])
+            return
+        from perception import find_wechat_window
+        win = find_wechat_window(self._calibration_wid)
+        if win is None or win.wid != self._calibration_wid or not self._calibration.matches(win):
+            self._render("status", "微信窗口已改变，请先重新校准消息区。", PALETTE["amber"])
+            return
+        from calibration_ui import CalibrationController
+        self._calibrating = True
+        self._retire_calibration_results()
+        self.applyWaiting_("正在校准输入区域…")
+        self.panel.orderOut_(None)
+        self._ov_panel.orderOut_(None)
+        try:
+            self.calibration_controller = CalibrationController.alloc().init().build(
+                self._input_calibration_finished, self._input_calibration_saved,
+                win=win, mode='input', message_region=self._calibration)
+        except (ValueError,OSError) as e:
+            self._calibrating = False
+            self._show()
+            self._render("status", str(e), PALETTE["red"])
+
+    @objc.python_method
+    def _input_calibration_finished(self, calibration, wid):
+        if calibration is not None:
+            self._input_calibration = calibration
+            self._input_calibration_wid = wid
+            self._input_calibration_saved = calibration.serialize()
+        self._calibrating = False
+        self._retire_calibration_results()
+        self.applyWaiting_("输入区已校准；点击填入时检查草稿，不发送。"
+                           if calibration else "已取消本次输入区校准")
+
     @objc.python_method
     def _calibration_finished(self, calibration, wid):
         if calibration is not None:
+            self._input_calibration = None
+            self._input_calibration_wid = None
             self._calibration = calibration
             self._calibration_wid = wid
             self._calibration_saved = calibration.serialize()
@@ -759,12 +803,15 @@ class HudController(NSObject):
         from settings_config import read_document, write_settings
         path = userconfig.env_files()[0]
         try:
-            write_settings(path,read_document(path),{"JEV_MESSAGE_REGION":""})
+            write_settings(path,read_document(path),{"JEV_MESSAGE_REGION":"", "JEV_INPUT_REGION":""})
         except (ValueError,OSError) as e:
             self._render("status",str(e),PALETTE["red"])
             return
         self._calibration = None
         self._calibration_wid = None
+        self._input_calibration = None
+        self._input_calibration_wid = None
+        self._input_calibration_saved = ""
         self._calibration_saved = ""
         self._calibration_required = False
         self._retire_calibration_results()
@@ -1117,8 +1164,8 @@ class HudController(NSObject):
 
     def fillCandidate_(self, sender):
         """Write the candidate into WeChat's input box (src/fill.py)."""
-        if getattr(self,"_calibration_required",False):
-            self._render("status", "校准实验模式暂不提供填入，请复制回复。", PALETTE["amber"])
+        if getattr(self,"_calibration_required",False) and self._input_calibration is None:
+            self._render("status", "请先从菜单栏校准输入区，或复制回复。", PALETTE["amber"])
             return
         idx = sender.tag()
         text = self.cand_texts[idx] if 0 <= idx < len(self.cand_texts) else None
@@ -1574,6 +1621,8 @@ class HudController(NSObject):
         if getattr(self, "_calibration", None) and (res.get("calibration_error")
                 or (res.get("window") and res["window"]["wid"] != self._calibration_wid)):
             self._calibration = None
+            self._input_calibration = None
+            self._input_calibration_wid = None
             self._retire_calibration_results()
             self._push("applyWaiting:", "微信窗口已改变，请重新校准消息区域。")
             return
@@ -1688,6 +1737,15 @@ class HudController(NSObject):
         res = dict(res, window=live_window, input_rect=live_input_rect)
         if res.get("manual_calibration"):
             self._input_target = None
+            editor = getattr(self, "_input_calibration", None)
+            if editor is not None and self._input_calibration_wid == res['window']['wid']:
+                from visual_fill import chat_signature
+                rect = editor.screen_rect(res['window'])
+                signature_rect = self._calibration.screen_rect(res['window'])
+                self._input_target = dict(box=None,rect=None,window=dict(res['window']),
+                    visual_rect=rect,manual_region=editor,signature_rect=signature_rect,
+                    chat_signature=chat_signature(res['window'],signature_rect),
+                    reason="手动校准输入区")
             self._input_window = dict(res["window"])
             self._input_next = float("inf")
             if not res.get("chat_title"):
@@ -2366,11 +2424,13 @@ class HudController(NSObject):
             x, y, w, h = target["visual_rect"]
             color = PALETTE["amber"]
             rect = NSMakeRect(x-win["x"], H-(y-win["y"])-h, w, h)
-            label = "虚线：视觉输入区 · 点击填入后校验（不发送）"
+            label = ("虚线：手动输入区 · 有草稿停止，不发送" if target.get('manual_region')
+                     else "虚线：视觉输入区 · 点击填入后校验（不发送）")
         else:
             color = PALETTE["amber"]
             rect = NSMakeRect(12, 12, 0, 0)
-            label = "输入框：" + (target["reason"] if target else "定位中…")
+            label = ("输入框：请从菜单栏校准输入区" if getattr(self,"_calibration_required",False)
+                     else "输入框：" + (target["reason"] if target else "定位中…"))
         chip = NSAttributedString.alloc().initWithString_attributes_(label, {
             NSFontAttributeName: font, NSForegroundColorAttributeName: NSColor.whiteColor(),
             NSBackgroundColorAttributeName: color.colorWithAlphaComponent_(0.85)})

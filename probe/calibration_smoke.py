@@ -26,6 +26,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('image')
 parser.add_argument('--window',type=float,nargs=2,required=True)
 parser.add_argument('--region',type=float,nargs=4,required=True)
+parser.add_argument('--input-region',type=float,nargs=4)
 args=parser.parse_args()
 f=str(Path(args.image).resolve())
 s=Q.CGImageSourceCreateWithURL(NSURL.fileURLWithPath_(f),None);i=Q.CGImageSourceCreateImageAtIndex(s,0,None)
@@ -37,7 +38,15 @@ with tempfile.TemporaryDirectory() as d:
  c=h.calibration_controller
  assert h._calibrating
  scale=c.canvas.bounds().size.width/win.w
- c.canvas.selection=tuple(v*scale for v in args.region)
+ # Exercise the actual native drag handlers, not just the stored rectangle.
+ c.canvas.selection=None
+ x,y,w,height=(v*scale for v in args.region)
+ start=c.canvas.convertPoint_toView_((x,y),None)
+ end=c.canvas.convertPoint_toView_((x+w,y+height),None)
+ c.canvas.mouseDown_(Mock(locationInWindow=Mock(return_value=start)))
+ c.canvas.mouseDragged_(Mock(locationInWindow=Mock(return_value=end)))
+ c.canvas.mouseUp_(Mock(locationInWindow=Mock(return_value=end)))
+ assert all(abs(a-b)<.01 for a,b in zip(c.canvas.selection,(x,y,w,height)))
  c.preview_(None)
  limit=time.monotonic()+30
  while c.busy and time.monotonic()<limit:
@@ -49,6 +58,22 @@ with tempfile.TemporaryDirectory() as d:
  with patch('calibration_ui.find_wechat_window',return_value=win):c.save_(None)
  assert h._calibration and h._calibration_wid==99 and not h._calibrating
  assert 'CUSTOM=preserved' in p.read_text() and p.stat().st_mode&0o777==0o600
+ if args.input_region:
+  with patch.object(userconfig,'env_files',return_value=[p]),patch('perception.find_wechat_window',return_value=win),patch('calibration_ui.capture_image',return_value=i):
+   h.calibrateInput_(None)
+  editor=h.calibration_controller
+  assert editor.mode=='input'
+  editor.canvas.selection=tuple(v*scale for v in args.input_region)
+  editor.preview_(None)
+  deadline=time.monotonic()+15
+  while editor.busy and time.monotonic()<deadline:
+   A.NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(.05))
+  assert editor.preview and editor.save_button.isEnabled()
+  v=editor.window.contentView();v.display();rep=v.bitmapImageRepForCachingDisplayInRect_(v.bounds());v.cacheDisplayInRect_toBitmapImageRep_(v.bounds(),rep)
+  rep.representationUsingType_properties_(A.NSBitmapImageFileTypePNG,{}).writeToFile_atomically_('/tmp/jev-input-calibration-ui.png',True)
+  with patch('calibration_ui.find_wechat_window',return_value=win):editor.save_(None)
+  assert h._input_calibration and h._input_calibration_wid==win.wid
+  assert 'JEV_INPUT_REGION=' in p.read_text()
  before=h._calibration
  with patch.object(userconfig,'env_files',return_value=[p]),patch('calibration_ui.find_wechat_window',return_value=win),patch('calibration_ui.capture_image',return_value=i):
   h.calibrateMessages_(None)

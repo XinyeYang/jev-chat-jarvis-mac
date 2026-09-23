@@ -564,7 +564,7 @@ def looks_like_sender_name(msg: Message, following: Message | None) -> bool:
 
 def read_calibrated(image, calibration, window, max_messages=12):
     """Explicit selected region. Never infer a fill target from a message selection."""
-    from calibrated_messages import extract
+    from calibrated_messages import extract, recover_numeric_bubbles
     t0 = time.perf_counter()
     x,y,w,h = calibration.rect()
     blocks = ocr_image(image, region=(x,1-y-h,w,h))
@@ -575,6 +575,7 @@ def read_calibrated(image, calibration, window, max_messages=12):
         top = max(b.y+b.h for b in candidates)
         line = [b for b in candidates if top-(b.y+b.h) < b.h*.6]
         title = " ".join(b.text for b in sorted(line,key=lambda b:b.x))
+    blocks = recover_numeric_bubbles(image, blocks, (x,y,w,h))
     msgs = extract(image, blocks, (x,y,w,h), max_messages)
     elapsed = (time.perf_counter()-t0)*1000
     return {"ok": True, "unchanged": False, "window": window, "messages": msgs,

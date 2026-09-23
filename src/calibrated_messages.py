@@ -123,3 +123,55 @@ def extract(image, blocks, rect, max_messages=12):
         messages.append(Message(b.text,'unknown',1-b.y-b.h,b.conf,
             h=b.h,lines=[b.text],x=b.x,w=b.w,last_y=1-b.y-b.h))
     return sorted(messages,key=lambda m:m.y)[-max_messages:]
+
+
+def recover_numeric_bubbles(image, blocks, rect):
+    """One local accurate OCR pass for empty, compact, uniform bubbles only.
+
+    Vision can omit isolated digits in a full chat image. Never infer sequences or
+    convert lookalike letters to numbers; retain only explicit digits at Vision confidence >= 0.5.
+    """
+    from perception import ocr_image, TextBlock
+    rgb = pixels(image)
+    H, W = rgb.shape[:2]
+    rx, ry, rw, rh = rect
+    x0, y0 = round(rx*W), round(ry*H)
+    crop = rgb[y0:round((ry+rh)*H), x0:round((rx+rw)*W)].astype(np.int16)
+    h, w = crop.shape[:2]
+    background = np.median(crop.reshape(-1, 3), axis=0)
+    colors, counts = np.unique(crop[::4, ::4].reshape(-1, 3), axis=0, return_counts=True)
+    recovered = []
+    for color in colors[np.argsort(counts)[-6:]]:
+        # Neutral received bubbles; do not search avatars, green overlays or stickers.
+        if np.ptp(color) > 12 or not 7 <= np.max(np.abs(color-background)) <= 65:
+            continue
+        mask = np.max(np.abs(crop-color), axis=2) <= 4
+        for sy, sx in np.argwhere(mask[::4, ::4])*4:
+            if not mask[sy, sx]: continue
+            found = component(mask, int(sx), int(sy), w*h*.35)
+            if found is None: break
+            l,t,r,b,area = found
+            mask[t:b, l:r] = False
+            bw, bh = r-l, b-t
+            if (not 16 <= bh <= h*.15 or not .5 <= bw/bh <= 2.5
+                    or area/(bw*bh) < .78 or l <= 0 or t <= 0 or r >= w or b >= h
+                    or min(l,w-r) > w*.25):
+                continue
+            full = (x0+l, y0+t, bw, bh)
+            if any(full[0] <= bb.x_center*W <= full[0]+bw
+                   and full[1] <= (1-bb.y-bb.h/2)*H <= full[1]+bh
+                   for bb in blocks+recovered):
+                continue
+            bubble = Quartz.CGImageCreateWithImageInRect(image, Quartz.CGRectMake(*full))
+            # Fixed local magnification, not a chain of guessed OCR fallbacks.
+            factor = max(1, int(np.ceil(192 / bh)))
+            ctx = Quartz.CGBitmapContextCreate(None,bw*factor,bh*factor,8,bw*factor*4,
+                Quartz.CGColorSpaceCreateDeviceRGB(),Quartz.kCGImageAlphaPremultipliedLast)
+            Quartz.CGContextDrawImage(ctx,Quartz.CGRectMake(0,0,bw*factor,bh*factor),bubble)
+            local = ocr_image(Quartz.CGBitmapContextCreateImage(ctx),languages=('en-US',),chat_only=False)
+            if len(local) != 1: continue
+            bb = local[0]
+            if not bb.text.isascii() or not bb.text.isdigit() or bb.conf < .5: continue
+            recovered.append(TextBlock(bb.text,bb.conf,(full[0]+bb.x*bw)/W,
+                1-(full[1]+(1-bb.y)*bh)/H,bb.w*bw/W,bb.h*bh/H))
+    return blocks+recovered
