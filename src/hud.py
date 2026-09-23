@@ -185,6 +185,14 @@ class HudController(NSObject):
         self = objc.super(HudController, self).init()
         if self is None:
             return None
+        self._input_calibration = None
+        self._input_calibration_wid = None
+        self._input_calibration_saved = userconfig.get("JEV_INPUT_REGION")
+        self._calibration = None
+        self._calibration_wid = None
+        self._calibration_saved = userconfig.get("JEV_MESSAGE_REGION")
+        self._calibration_required = bool(self._calibration_saved)
+        self._calibrating = False
         self.last_seen = None          # newest message text observed
         self._reply_key = None         # (conversation, incoming text), never an outgoing message
         self._reply_epoch = 0          # invalidate even if the same text reappears later
@@ -358,6 +366,23 @@ class HudController(NSObject):
         view.addSubview_(self.settings_button)
         self._fixed.append((self.settings_button, PANEL_W - 44, 4, 32, 32))
 
+        self.calibration_button = self._make_button(PANEL_W - 80, 0, 32, 32,
+                                                    "", "calibrateMessages:", 0)
+        icon = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+            "viewfinder", "校准消息区和输入区")
+        self.calibration_button.setImage_(icon.imageWithSymbolConfiguration_(symbol_config))
+        self.calibration_button.setImagePosition_(AppKit.NSImageOnly)
+        self.calibration_button.setImageScaling_(AppKit.NSImageScaleNone)
+        self.calibration_button.setBordered_(False)
+        self.calibration_button.setContentTintColor_(PALETTE["muted"])
+        self.calibration_button.layer().setBackgroundColor_(NSColor.clearColor().CGColor())
+        self.calibration_button.layer().setBorderWidth_(0.0)
+        self.calibration_button.setToolTip_("校准消息区和输入区")
+        self.calibration_button.setAccessibilityLabel_("校准消息区和输入区")
+        self.calibration_button.setHidden_(False)
+        view.addSubview_(self.calibration_button)
+        self._fixed.append((self.calibration_button, PANEL_W - 80, 4, 32, 32))
+
         # Decorative surfaces are fixed; every string still comes from the existing rows.
         for surface, x, top, w, h in (
             (self._make_surface(12, PALETTE["surface"]), 14, 54, PANEL_W - 28, 62),
@@ -406,7 +431,7 @@ class HudController(NSObject):
             self._detail_views.append(label)
 
         for key, x, top, w, h, size, color, bold in (
-            ("chat", 20, 14, PANEL_W - 76, 20, 15, PALETTE["accent"], True),
+            ("chat", 20, 14, PANEL_W - 112, 20, 15, PALETTE["accent"], True),
             ("status", 20, 36, PANEL_W - 40, 14, 10, PALETTE["muted"], False),
             ("message", 22, 82, PANEL_W - 44, 38, 14, PALETTE["text"], False),
             ("sender", 22, 62, PANEL_W - 112, 14, 10, PALETTE["muted"], False),
@@ -704,6 +729,8 @@ class HudController(NSObject):
             ("YOLO 检测框", "toggleBoxes:", ""),
             ("立即重新分析", "reanalyze:", ""),
             ("模型设置…", "openSettings:", ","),
+            ("校准区域…", "calibrateMessages:", ""),
+            ("恢复自动识别区域", "clearCalibration:", ""),
         ):
             menu.addItemWithTitle_action_keyEquivalent_(title, action, key)
         menu.addItem_(AppKit.NSMenuItem.separatorItem())
@@ -715,6 +742,76 @@ class HudController(NSObject):
         self.boxes_item.setState_(
             AppKit.NSOnState if self._show_boxes else AppKit.NSOffState)
         self.status_item.setMenu_(menu)
+
+    @objc.python_method
+    def _retire_calibration_results(self):
+        self._foreground_epoch += 1
+        self._reply_epoch += 1
+        self._gen_epoch += 1
+        self._reply_key = None
+        self.last_seen = self.analyzed_text = None
+        self._prejudge_req = self._prejudge_result = None
+        self._pregen_req = self._pregen_result = None
+        self._fingerprint = self._last_full = self._layout_key = None
+        self._empty_frame_since = None
+        self._input_target = self._input_window = None
+        self._stable_n = 0
+        self._next_read_ts = 0
+
+    def calibrateMessages_(self, sender):
+        if self._calibrating:
+            self.calibration_controller.window.makeKeyAndOrderFront_(None)
+            return
+        from calibration_ui import CalibrationController
+        self._calibrating = True
+        self._retire_calibration_results()
+        self.applyWaiting_("正在校准消息区和输入区…")
+        self.panel.orderOut_(None)
+        self._ov_panel.orderOut_(None)
+        try:
+            self.calibration_controller = CalibrationController.alloc().init().build(
+                self._calibration_finished, self._calibration_saved,
+                saved_input=self._input_calibration_saved)
+        except (ValueError,OSError) as e:
+            self._calibrating = False
+            self._show()
+            self._render("status", str(e), PALETTE["red"])
+
+    @objc.python_method
+    def _calibration_finished(self, calibration, wid):
+        if calibration is not None:
+            message, editor = calibration
+            self._input_calibration = editor
+            self._input_calibration_wid = wid
+            self._input_calibration_saved = editor.serialize()
+            self._calibration = message
+            self._calibration_wid = wid
+            self._calibration_saved = message.serialize()
+            self._calibration_required = True
+        self._calibrating = False
+        self._retire_calibration_results()
+        self._show()
+        self.applyWaiting_("校准完成；请回到微信。调整分栏后请重新校准。"
+                           if calibration else "已取消本次校准")
+
+    def clearCalibration_(self, sender):
+        if self._calibrating: return
+        from settings_config import read_document, write_settings
+        path = userconfig.env_files()[0]
+        try:
+            write_settings(path,read_document(path),{"JEV_MESSAGE_REGION":"", "JEV_INPUT_REGION":""})
+        except (ValueError,OSError) as e:
+            self._render("status",str(e),PALETTE["red"])
+            return
+        self._calibration = None
+        self._calibration_wid = None
+        self._input_calibration = None
+        self._input_calibration_wid = None
+        self._input_calibration_saved = ""
+        self._calibration_saved = ""
+        self._calibration_required = False
+        self._retire_calibration_results()
+        self.applyWaiting_("已恢复自动识别区域")
 
     def openSettings_(self, sender):
         from settings import SettingsController
@@ -767,7 +864,7 @@ class HudController(NSObject):
             if border is not None:
                 layer.setBorderColor_(border.CGColor())
         for button in self._appearance_buttons:
-            if button is self.settings_button:
+            if button is self.settings_button or button is self.calibration_button:
                 continue  # the gear stays an unboxed icon
             button.layer().setBackgroundColor_(adapted(PALETTE["row"]).CGColor())
             button.layer().setBorderColor_(adapted(PALETTE["edge"]).CGColor())
@@ -1063,6 +1160,9 @@ class HudController(NSObject):
 
     def fillCandidate_(self, sender):
         """Write the candidate into WeChat's input box (src/fill.py)."""
+        if getattr(self,"_calibration_required",False) and self._input_calibration is None:
+            self._render("status", "请点击右上角校准图标，确认消息区和输入区。", PALETTE["amber"])
+            return
         idx = sender.tag()
         text = self.cand_texts[idx] if 0 <= idx < len(self.cand_texts) else None
         if not text:
@@ -1460,6 +1560,8 @@ class HudController(NSObject):
     def tick_(self, timer):
         # Progress/status refresh first: a live download must stay visible even while
         # WeChat is gone or the read loop is gated (applyHidden_ keeps the panel up).
+        if getattr(self, "_calibrating", False):
+            return
         self._refresh_model_status()
         # Check activation before pause/busy/read-cadence gates.  The timer keeps
         # firing while OCR is in flight, so a quick WeChat -> Chrome -> WeChat
@@ -1507,15 +1609,32 @@ class HudController(NSObject):
             self._push("applyError:", "需要屏幕录制权限 · 系统设置 › 隐私与安全性")
             self._next_read_ts = time.time() + SLOW_TICK
             return
+        if getattr(self, "_calibrating", False):
+            return
+        if getattr(self, "_calibration_required", False) and self._calibration is None:
+            self._push("applyWaiting:", "请点击右上角校准图标，确认消息区和输入区。")
+            self._next_read_ts = time.time() + SLOW_TICK
+            return
         capture_foreground_epoch = self._foreground_epoch
         capture_context_version = self._context_version
         try:
+            extra = {"calibration": self._calibration} if getattr(self,"_calibration",None) else {}
             res = read_conversation(previous_wid=self._win_wid,
                                     prev_fingerprint=self._fingerprint,
-                                    prev_layout=getattr(self, "_layout_key", None))
+                                    prev_layout=getattr(self, "_layout_key", None), **extra)
         except Exception as e:
             self._push("applyError:", f"读取失败: {type(e).__name__}")
             self._next_read_ts = time.time() + SLOW_TICK
+            return
+        if capture_foreground_epoch != self._foreground_epoch:
+            return
+        if getattr(self, "_calibration", None) and (res.get("calibration_error")
+                or (res.get("window") and res["window"]["wid"] != self._calibration_wid)):
+            self._calibration = None
+            self._input_calibration = None
+            self._input_calibration_wid = None
+            self._retire_calibration_results()
+            self._push("applyWaiting:", "微信窗口已改变，请重新校准消息区域。")
             return
         # Re-check after the blocking capture/OCR.  tick_ may have observed a
         # complete leave+return while this worker was busy; in that case even a
@@ -1590,7 +1709,7 @@ class HudController(NSObject):
             # the settle/analyze gate below still runs every read; an unchanged frame
             # just skips re-deriving the messages it would act on
             res = self._last_full
-        elif (not res["messages"] and self._last_full is not None
+        elif (not res.get("manual_calibration") and not res["messages"] and self._last_full is not None
               and self._last_full.get("messages")):
             # Transient empty frame (#58): the window is still enumerated and the capture
             # succeeded, but OCR returned 0 blocks (WeChat 4.x redraw glitch). Reuse the
@@ -1628,6 +1747,21 @@ class HudController(NSObject):
             self._push("applyChat:", res.get("chat_title") or "")
 
         res = dict(res, window=live_window, input_rect=live_input_rect)
+        if res.get("manual_calibration"):
+            self._input_target = None
+            editor = getattr(self, "_input_calibration", None)
+            if editor is not None and self._input_calibration_wid == res['window']['wid']:
+                from visual_fill import chat_signature
+                rect = editor.screen_rect(res['window'])
+                signature_rect = self._calibration.screen_rect(res['window'])
+                self._input_target = dict(box=None,rect=None,window=dict(res['window']),
+                    visual_rect=rect,manual_region=editor,signature_rect=signature_rect,
+                    chat_signature=chat_signature(res['window'],signature_rect),
+                    reason="手动校准输入区")
+            self._input_window = dict(res["window"])
+            self._input_next = float("inf")
+            if not res.get("chat_title"):
+                res = dict(res, messages=[])
         # AX traversal stays on the read worker, never the Cocoa drawing thread.
         now_input = time.monotonic()
         if (res["window"] != getattr(self, "_input_window", None)
@@ -1649,6 +1783,13 @@ class HudController(NSObject):
                 self._last_full = None
                 return
             msgs = res["messages"]
+            # 手动校准模式下，无法确认归属的文字不进入会话历史与模型上下文。
+            # 必须在 visible/observe 之前过滤——事后过滤会让 _observed_offset 的
+            # 索引错位；检测框仍画原始列表（含「未确认」框），见下方 applyBoxes。
+            overlay_msgs = None
+            if res.get("manual_calibration"):
+                overlay_msgs = msgs
+                msgs = [m for m in msgs if m.side != "unknown"]
             visible = [(m.text, m.side, m.sender or "") for m in msgs]
             self._observed_messages, self._observed_offset = visible, 0
             if self.history_enabled and self.conversations and not self.conversations.error:
@@ -1677,7 +1818,7 @@ class HudController(NSObject):
             # YOLO overlay: repaint whenever a read produced geometry — unchanged reads reuse
             # the cached messages, so the boxes stay up even while the pane is quiet
             if self._show_boxes:
-                self._push("applyBoxes:", (res["window"], msgs,
+                self._push("applyBoxes:", (res["window"], overlay_msgs or msgs,
                                            newest.text if newest else None))
             if newest is None:
                 self._push("applyWaiting:", "暂未确认输入区边界，暂停分析"
@@ -2324,14 +2465,14 @@ class HudController(NSObject):
         self.applyHidden_(reason)
 
     def applyPosition_(self, win):
-        if self._wechat_frontmost is not True:
+        if getattr(self,"_calibrating",False) or self._wechat_frontmost is not True:
             return
         self._position_near(win)
 
     # --- YOLO overlay callbacks (visual only; see _build_overlay)
     def applyBoxes_(self, payload):
         """Repaint the overlay from the last read's window geometry + messages."""
-        if self._wechat_frontmost is not True or not self._show_boxes:
+        if getattr(self,"_calibrating",False) or self._wechat_frontmost is not True or not self._show_boxes:
             return
         win, msgs, newest_text = payload
         W, H = win["w"], win["h"]
@@ -2375,11 +2516,13 @@ class HudController(NSObject):
             x, y, w, h = target["visual_rect"]
             color = PALETTE["amber"]
             rect = NSMakeRect(x-win["x"], H-(y-win["y"])-h, w, h)
-            label = "虚线：视觉输入区 · 点击填入后校验（不发送）"
+            label = ("虚线：手动输入区 · 有草稿停止，不发送" if target.get('manual_region')
+                     else "虚线：视觉输入区 · 点击填入后校验（不发送）")
         else:
             color = PALETTE["amber"]
             rect = NSMakeRect(12, 12, 0, 0)
-            label = "输入框：" + (target["reason"] if target else "定位中…")
+            label = ("输入框：请点击右上角图标校准" if getattr(self,"_calibration_required",False)
+                     else "输入框：" + (target["reason"] if target else "定位中…"))
         chip = NSAttributedString.alloc().initWithString_attributes_(label, {
             NSFontAttributeName: font, NSForegroundColorAttributeName: NSColor.whiteColor(),
             NSBackgroundColorAttributeName: color.colorWithAlphaComponent_(0.85)})
