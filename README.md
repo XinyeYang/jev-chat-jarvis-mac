@@ -8,7 +8,15 @@
 
 ## 反馈与帮助
 
-**先自查：[常见问题解答（FAQ）](docs/FAQ.md)——配置文件、日志、模型路径、安装报错、旧版空白面板速查。** 交流群、公众号等联系方式见文末[「交流反馈」](#交流反馈)；数据流向与隐私见 [PRIVACY.md](PRIVACY.md)。
+**合作、反馈、进群，请公众号私信**：
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/wechat-mp-qr.png" width="200" alt="扫码关注公众号"><br><sub>公众号</sub></td>
+  </tr>
+</table>
+
+**先自查：[常见问题解答（FAQ）](docs/FAQ.md)——配置文件、日志、模型路径、安装报错、旧版空白面板速查。** 交流群群码见文末[「交流反馈」](#交流反馈)；数据流向与隐私见 [PRIVACY.md](PRIVACY.md)。
 
 ## 平台支持
 
@@ -204,15 +212,7 @@ Copyright © 2026 eatmoreduck 与 jev-chat 贡献者。代码以 MIT 协议开�
 
 ## 交流反馈
 
-**合作、反馈、进群，请公众号私信**：
-
-<table>
-  <tr>
-    <td align="center"><img src="docs/wechat-mp-qr.png" width="200" alt="扫码关注公众号"><br><sub>公众号</sub></td>
-  </tr>
-</table>
-
-也可扫码进交流群（1、2 群已满，从 3 群开始扫，满了顺序换下一个）：
+也可扫码进交流群（1、2 群已满，从 3 群开始扫，满了顺序换下一个）；合作、反馈、进群也都可以公众号私信（二维码见顶部「反馈与帮助」）：
 
 <table>
   <tr>
