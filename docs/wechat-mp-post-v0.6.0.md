@@ -50,15 +50,15 @@
 
 **装**：macOS 13+（Apple Silicon），GitHub 找 `jev-chat/jev-chat-jarvis-mac`，Releases 下载 v0.6.0 的 zip，拖进「应用程序」，第一次右键 → 打开（没做公证，只需这一次）。读微信授「屏幕录制」，读 QQ 和「填入」授「辅助功能」。老用户直接覆盖安装，配置和校准数据都不受影响。MIT 开源。
 
-【配图 5：`docs/wechat-group-2.png` / `-3` / `-4` / `-5` 四张**按顺序**（编辑器里排 2×2），下面接 `docs/wechat-mp-qr.png`（公众号）】
+【配图 5：`docs/wechat-group-3.png` / `-4` / `-5` 三张**按顺序**，下面接 `docs/wechat-mp-qr.png`（公众号）】
 
-交流群从 2 群往下扫（1 群满了），满了换下一个；群满了或者二维码过期了，关注公众号私信「进群」拿最新进群方式——**以后有新版本也都在公众号通知**。bug 走 GitHub Issues。
+合作、反馈、进群，请公众号私信；交流群 1、2 群已满，从 3 群往下扫，满了换下一个。bug 走 GitHub Issues。
 
 ---
 
 ## 发布提示
 
-- **素材顺序**：① 动图 `docs/demo.gif` → ② 首次校准提示 `docs/first-run-hint.png` → ③ 校准界面 `docs/calibration-window.png` → ④ 识别效果实拍 `docs/recognition-effect.png` → ⑤ 群码 2×2 + 公众号 `docs/wechat-mp-qr.png`。
+- **素材顺序**：① 动图 `docs/demo.gif` → ② 首次校准提示 `docs/first-run-hint.png` → ③ 校准界面 `docs/calibration-window.png` → ④ 识别效果实拍 `docs/recognition-effect.png` → ⑤ 群码三张（3/4/5 群）+ 公众号 `docs/wechat-mp-qr.png`。
 - **⚠️ 打码**：`calibration-window.png` 左侧边栏联系人昵称/头像可见，**必须打码后才能发**；`recognition-effect.png` 已打码，复核群名与残留像素。封面图可用 `recognition-effect.png` 裁 2.35:1。
 - **想加技术向的可选一句**（放「一」段末尾）：`8 类意图零样本回归 86.4%（22 条、只看单条消息的无上下文口径）`。
 - **外链**：未认证公众号发不了外链，GitHub 地址写成纯文本让读者自己搜。
