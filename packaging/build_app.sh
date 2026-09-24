@@ -91,9 +91,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key>   <true/>
     <!-- permission prompts are shown by the system; these strings explain why -->
     <key>NSScreenCaptureUsageDescription</key>
-    <string>jev-chat-jarvis 需要读取微信窗口的画面，才能在本地识别消息文字（不上传）。</string>
+    <string>jev-chat-jarvis 需要读取聊天窗口的画面，才能在本地识别消息文字（不上传）。</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>jev-chat-jarvis 需要把选中的回复粘贴到微信输入框。</string>
+    <string>jev-chat-jarvis 需要把选中的回复粘贴到聊天输入框。</string>
 </dict>
 </plist>
 PLIST
