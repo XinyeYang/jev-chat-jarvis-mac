@@ -87,7 +87,7 @@ def write_text(text, target, app):
     global _LAST_ATTEMPT
     win=target['window']
     if not window_is_current(win,app):
-        return False,'微信窗口已变化，请等检测框更新后重试'
+        return False,'聊天窗口已变化，请等检测框更新后重试'
     manual = target.get('manual_region')
     if manual is not None:
         from types import SimpleNamespace
@@ -125,7 +125,7 @@ def write_text(text, target, app):
         app.activateWithOptions_(AppKit.NSApplicationActivateIgnoringOtherApps)
         time.sleep(.15)
         if not window_is_current(win,app,require_front=True):
-            return False,'微信没有获得焦点，请先点微信输入区再重试'
+            return False,'聊天应用没有获得焦点，请先点聊天输入区再重试'
         for event_type in (Q.kCGEventLeftMouseDown,Q.kCGEventLeftMouseUp):
             event=Q.CGEventCreateMouseEvent(None,event_type,point,Q.kCGMouseButtonLeft)
             Q.CGEventSetFlags(event, 0)

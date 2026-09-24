@@ -22,9 +22,9 @@ import chat_context
 from support_hud import Harness, HUD, block
 
 
-def qq_app():
+def build_app():
     """A minimal QQ-shaped adapter: AX path, no screen capture anywhere."""
-    return SimpleNamespace(key='qq', display_name='QQ', needs_screen_capture=False,
+    return SimpleNamespace(key='ax_app', display_name='QQ', needs_screen_capture=False,
                            read_conversation=Mock(),
                            locate_input=Mock(return_value={'box': None, 'rect': None,
                                                            'reason': 'test'}),
@@ -820,7 +820,7 @@ class HudReplyTests(unittest.TestCase):
         self.h.fillCandidate_(sender)
 
         self.h._render.assert_any_call(
-            'status', '填入失败：微信 / QQ 不在前台', HUD['PALETTE']['red'])
+            'status', '填入失败：聊天应用不在前台', HUD['PALETTE']['red'])
         HUD['FAKE_APP'].fill_text.assert_not_called()
 
     def test_fill_candidate_writes_through_current_app_adapter(self):
@@ -841,7 +841,7 @@ class HudReplyTests(unittest.TestCase):
         self.h.cand_texts = ['收到，马上看']
         self.h._app = HUD['FAKE_APP']     # key='wechat'
         self.h._input_target = {'box': (1, 2, 3, 4), 'rect': None,
-                                'reason': 'test', 'app': 'qq'}
+                                'reason': 'test', 'app': 'ax_app'}
         sender = Mock()
         sender.tag.return_value = 0
 
@@ -853,20 +853,20 @@ class HudReplyTests(unittest.TestCase):
         HUD['FAKE_APP'].fill_text.assert_not_called()
 
     def test_warm_apps_pays_each_apps_one_off_loads(self):
-        warm_wechat = SimpleNamespace(display_name='微信', warm=Mock(return_value=5.0))
+        warm_capture = SimpleNamespace(display_name='微信', warm=Mock(return_value=5.0))
         ax_qq = SimpleNamespace(display_name='QQ', warm=Mock(return_value=None))
         self.h._read_once = False
 
-        with patch.dict(HUD, {'APPS': (warm_wechat, ax_qq)}):
+        with patch.dict(HUD, {'APPS': (warm_capture, ax_qq)}):
             self.h._warm_apps()
 
         self.assertTrue(self.h._read_once)
-        warm_wechat.warm.assert_called_once()
+        warm_capture.warm.assert_called_once()
         ax_qq.warm.assert_called_once()
 
     def test_qq_missing_accessibility_gates_reads(self):
-        qq = qq_app()
-        HUD['frontmost_app'].return_value = qq
+        ax_app = build_app()
+        HUD['frontmost_app'].return_value = ax_app
         HUD['fill'].has_accessibility.return_value = False
 
         self.h._work_inner()
@@ -874,18 +874,18 @@ class HudReplyTests(unittest.TestCase):
         self.flush()
 
         self.h.applyError_.assert_called_with('需要辅助功能权限 · 系统设置 › 隐私与安全性')
-        qq.read_conversation.assert_not_called()
+        ax_app.read_conversation.assert_not_called()
         HUD['fill'].request_accessibility.assert_called_once()
         HUD['screen_capture_ok'].assert_not_called()
 
     def test_qq_path_never_enters_visual_fallback(self):
-        qq = qq_app()
-        qq.read_conversation.return_value = {
+        ax_app = build_app()
+        ax_app.read_conversation.return_value = {
             'ok': True, 'unchanged': False, 'fingerprint': b'f',
             'window': {'wid': 5}, 'chat_title': 'chat',
             'messages': extract_messages([block('下午开会', .40, .70, .15)]),
         }
-        HUD['frontmost_app'].return_value = qq
+        HUD['frontmost_app'].return_value = ax_app
 
         with patch('visual_fill.chat_signature') as sig, \
                 patch('input_region.locate_visual_input') as lvi:
@@ -898,25 +898,25 @@ class HudReplyTests(unittest.TestCase):
         self.assertIsNotNone(self.h._input_target)
         self.assertNotIn('visual_rect', self.h._input_target)
         self.assertNotIn('chat_signature', self.h._input_target)
-        self.assertEqual(self.h._input_target['app'], 'qq')
+        self.assertEqual(self.h._input_target['app'], 'ax_app')
 
     def test_switching_adapter_hides_panel_and_resets_reply(self):
-        qq = qq_app()
+        ax_app = build_app()
         self.h._app = HUD['FAKE_APP']
         self.h._reply_key = ('wechat', 'chat', '下午开会')
         self.h._foreground_epoch = 3
 
-        self.h._set_foreground_state(qq)
+        self.h._set_foreground_state(ax_app)
         self.flush()
 
         self.assertEqual(self.h._foreground_epoch, 4)
-        self.assertIs(self.h._app, qq)
+        self.assertIs(self.h._app, ax_app)
         self.assertIsNone(self.h._reply_key)
         self.h.applyForegroundHidden_.assert_called_once_with('已切换到QQ')
 
     def test_capture_returning_other_adapter_discards_snapshot(self):
-        qq = qq_app()
-        states = iter([HUD['FAKE_APP'], qq])
+        ax_app = build_app()
+        states = iter([HUD['FAKE_APP'], ax_app])
         HUD['frontmost_app'].side_effect = lambda: next(states)
         HUD['read_conversation'].return_value = {
             'ok': True, 'unchanged': False, 'fingerprint': b'stale',

@@ -1,7 +1,7 @@
-"""Perception layer: find WeChat's window, capture it, OCR it, extract the conversation.
+"""Perception layer: find the chat app's window, capture it, OCR it, extract the conversation.
 
-Validated facts this module is built on (probed 2026-09-21 on WeChat 4.1 Mac):
-  * `screencapture -l <windowid>` returns real content even when WeChat is not frontmost,
+Validated facts this module is built on (probed 2026-09-21 on the target app, 4.x Mac):
+  * `screencapture -l <windowid>` returns real content even when the app is not frontmost,
     so our HUD floating above it never pollutes the capture.
   * Vision OCR reads Simplified Chinese chat text at conf 1.00 on message bodies;
     errors are rare and confined to unusual glyphs.
@@ -123,12 +123,12 @@ def request_screen_capture() -> bool:
 
 
 def frontmost_app_is_wechat() -> bool | None:
-    """Whether the app currently receiving user input is WeChat.
+    """Whether the app currently receiving user input is the chat app.
 
-    The window-ID capture path can read an obscured WeChat window, which is useful for
+    The window-ID capture path can read an obscured chat window, which is useful for
     OCR but not a safe display boundary: a global floating HUD left above Chrome looks
     as if browser text were analysed. Keep foreground ownership separate from window
-    discovery so returning to WeChat can force a fresh capture instead of reusing cache.
+    discovery so returning to the chat app can force a fresh capture instead of reusing cache.
     """
     try:
         import AppKit
@@ -216,7 +216,7 @@ def find_wechat_window(previous_wid: int | None = None) -> WindowInfo | None:
             x=float(b.get("X", 0)), y=float(b.get("Y", 0)),
             w=float(b.get("Width", 0)), h=float(b.get("Height", 0)),
         )
-        # a chat window: titled and roughly window-shaped. 500pt admits WeChat 4.x's
+        # a chat window: titled and roughly window-shaped. 500pt admits the app's 4.x
         # default detached chat window; the noise surfaces sampled live (tooltips,
         # popups) are ≤360pt wide or under 400pt tall.
         if not title or wi.w < 500 or wi.h < 400:
@@ -239,7 +239,7 @@ def find_wechat_window(previous_wid: int | None = None) -> WindowInfo | None:
                         (wi.x, wi.y, wi.w, wi.h), focused)):
                     return wi
 
-    # stick with the window we already chose: WeChat 4.x keeps several equally-sized
+    # stick with the window we already chose: The app keeps several equally-sized
     # windows around, and re-picking each tick let the target jump between them.
     # Only keep that choice within the same priority; a newly available main wins.
     if previous_wid is not None and best is not None and best.wid != previous_wid:
@@ -385,7 +385,7 @@ def capture_image(wid: int, nominal: bool = True):
     """
     try:
         with tempfile.TemporaryDirectory() as td:
-            png = Path(td) / "wechat.png"
+            png = Path(td) / "chat.png"
             if not capture_window(wid, png):
                 return None
             return _load_png_image(png, _window_point_size(wid) if nominal else None)
@@ -405,7 +405,7 @@ def warm_ocr() -> float:
 
     The first text recognition in a process costs ~2x steady state (~0.7 s vs ~250 ms)
     while Vision loads its recognition model. Running that first request on a small white
-    image needs no WeChat window at all — it works even when WeChat starts after this
+    image needs no chat window at all — it works even when the app starts after this
     app — so the read loop's first real read finds the framework already paid for.
     Returns the elapsed milliseconds, or -1.0 when the request itself failed.
     """
@@ -503,7 +503,7 @@ def extract_chat_title(blocks: list[TextBlock]) -> str:
     # No length cap on purpose: an empty title collides reply keys across chats
     # (key = (chat_title, text)), which is worse than the occasional single-glyph
     # OCR smudge promoted to a title.
-    # WeChat titles are left-aligned; centered headers would need layout detection.
+    # Chat titles are left-aligned; centered headers would need layout detection.
     # A real contact name can be one character, so length cannot tell title from controls.
     starts = [b for b in cands if b.x < (CHAT_PANE_X_MIN + 1) / 2]
     if not starts:
@@ -517,7 +517,7 @@ def extract_chat_title(blocks: list[TextBlock]) -> str:
             break
         keep.append(b)
     title = " ".join(b.text for b in keep).strip()
-    # WeChat appends a changing member count; it is not part of the conversation key.
+    # The app appends a changing member count; it is not part of the conversation key.
     return re.sub(r"\s*[（(]\s*\d+\s*[）)]\s*$", "", title).strip()
 
 
@@ -621,7 +621,7 @@ def extract_messages(blocks: list[TextBlock], max_messages: int = 12, input_top=
                                     last_y=b.y, sender=pending_sender))
             pending_sender = None
 
-    # Stray sender names: WeChat renders one above every bubble — including
+    # Stray sender names: the app renders one above every bubble — including
     # image-only messages, whose media OCR cannot read — so a short them line that
     # ended up as a message of its own is a name, never something to judge. Our own
     # bubbles have no name above them, and short outgoing text can be just as small
@@ -690,7 +690,7 @@ def read_conversation(max_messages: int = 12, previous_wid: int | None = None,
     t0 = time.perf_counter()
     win = find_wechat_window(previous_wid)
     if win is None:
-        return {"ok": False, "error": "WeChat main window not found", "messages": []}
+        return {"ok": False, "error": "Chat main window not found", "messages": []}
 
     # Always use the subprocess path in production. A Python thread cannot cancel
     # CGWindowListCreateImage once macOS enters ScreenCaptureKit, while a timed
@@ -703,7 +703,7 @@ def read_conversation(max_messages: int = 12, previous_wid: int | None = None,
     # previous window's boundary after resizing or switching windows.
     if image is None:
         with tempfile.TemporaryDirectory() as td:
-            png = Path(td) / "wechat.png"
+            png = Path(td) / "chat.png"
             if capture_window(win.wid, png):
                 image = _load_png_image(png)
     if calibration is not None:

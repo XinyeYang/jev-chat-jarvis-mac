@@ -13,7 +13,7 @@ from perception import WindowInfo
 
 class ChatApp(Protocol):
     key: str                     # "wechat" | "qq"：进日志、进回复缓存 key
-    display_name: str            # "微信" | "QQ"：进面板文案
+    display_name: str            # 进面板文案的显示名
     bundle_ids: tuple[str, ...]
     app_names: tuple[str, ...]
     needs_screen_capture: bool   # 微信 True（截图 + OCR），QQ False（只需辅助功能）

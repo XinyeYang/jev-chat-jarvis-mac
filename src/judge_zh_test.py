@@ -1,7 +1,7 @@
 """Chinese intent-judgment test: can a local Jev-shaped model read a boss message?
 
 Zero-shot, no training — this measures how much labeling work the app will need.
-Cases are real messages pulled from the live WeChat window plus realistic variants.
+Cases are real messages pulled from the live chat window plus realistic variants.
 """
 
 from __future__ import annotations

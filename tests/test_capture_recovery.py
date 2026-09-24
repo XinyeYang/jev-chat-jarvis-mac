@@ -118,7 +118,7 @@ class CaptureRecoveryTests(unittest.TestCase):
             fake = Path(td) / "screencapture"
             fake.write_text("#!/bin/sh\n/bin/sleep 1\n", encoding="utf-8")
             os.chmod(fake, 0o755)
-            output = Path(td) / "wechat.png"
+            output = Path(td) / "chat.png"
             old_path = os.environ.get("PATH")
             os.environ["PATH"] = td
             try:

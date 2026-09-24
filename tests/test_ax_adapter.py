@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
-from apps import qq
+from apps import ax_app
 
 
 class N:
@@ -83,22 +83,22 @@ def list_window():
 class ParseTests(unittest.TestCase):
     def test_find_editor_only_in_chat_window(self):
         ax = FakeAX()
-        self.assertIsNotNone(qq.find_editor(ax, chat_window([])))
-        self.assertIsNone(qq.find_editor(ax, list_window()))
+        self.assertIsNotNone(ax_app.find_editor(ax, chat_window([])))
+        self.assertIsNone(ax_app.find_editor(ax, list_window()))
 
     def test_title_prefers_editor_description_then_window_title(self):
         ax = FakeAX()
         win = chat_window([])
-        self.assertEqual(qq.chat_title(ax, win, qq.find_editor(ax, win)), '很难约的王小姐')
+        self.assertEqual(ax_app.chat_title(ax, win, ax_app.find_editor(ax, win)), '很难约的王小姐')
         win2 = chat_window([], ed=editor(desc=''))
-        self.assertEqual(qq.chat_title(ax, win2, qq.find_editor(ax, win2)), '很难约的王小…')
+        self.assertEqual(ax_app.chat_title(ax, win2, ax_app.find_editor(ax, win2)), '很难约的王小…')
 
     def test_sides_text_and_order(self):
         ax = FakeAX()
         win = chat_window([message('在吗', 'them', 300.0, sender='王小姐'),
                            message('在的', 'me', 360.0, sender='西行树'),
                            message('周三有空吗', 'them', 420.0, sender='王小姐')])
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
         self.assertEqual([(m.side, m.text, m.sender) for m in msgs],
                          [('them', '在吗', '王小姐'), ('me', '在的', '西行树'), ('them', '周三有空吗', '王小姐')])
         self.assertTrue(all(0.0 <= m.y < 1.0 and 0.0 < m.h < 1.0 and 0.0 <= m.x < 1.0 for m in msgs))
@@ -109,7 +109,7 @@ class ParseTests(unittest.TestCase):
     def test_image_only_message_is_skipped(self):
         ax = FakeAX()
         win = chat_window([message('', 'them', 300.0, image_only=True), message('好', 'me', 360.0)])
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
         self.assertEqual([m.text for m in msgs], ['好'])
 
     def test_virtualized_and_offscreen_nodes_are_dropped(self):
@@ -118,19 +118,19 @@ class ParseTests(unittest.TestCase):
                 message('窗口外', 'them', 20.0),                          # y 在窗口顶边（143）之上
                 message('可见', 'them', 420.0)]
         win = chat_window(rows)
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
         self.assertEqual([m.text for m in msgs], ['可见'])
 
     def test_node_overlapping_editor_is_dropped(self):
         ax = FakeAX()
         win = chat_window([message('草稿回显', 'me', 800.0), message('正文', 'them', 420.0)])
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
         self.assertEqual([m.text for m in msgs], ['正文'])
 
     def test_keeps_only_newest_max_messages(self):
         ax = FakeAX()
         win = chat_window([message(f'第{i}条', 'them', 250.0 + i * 30.0) for i in range(15)])   # 最后一条 670+38 仍在编辑器（y≥753）之上
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win), max_messages=12)
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win), max_messages=12)
         self.assertEqual(len(msgs), 12)
         self.assertEqual(msgs[0].text, '第3条')
         self.assertEqual(msgs[-1].text, '第14条')
@@ -142,7 +142,7 @@ class ParseTests(unittest.TestCase):
         content.children = [N('AXStaticText', value='@缓缓', rect=(401.0, 301.0, 60.0, 16.0)),
                             N('AXStaticText', value=' 复活吧', rect=(560.0, 301.0, 40.0, 16.0))]
         win = chat_window([row])
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
         self.assertEqual(msgs[0].text, '@缓缓 复活吧')
 
     def test_wrapped_line_keeps_dom_order_across_smaller_x(self):
@@ -154,7 +154,7 @@ class ParseTests(unittest.TestCase):
                             N('AXStaticText', value=' 复活吧', rect=(560.0, 301.0, 40.0, 16.0)),
                             N('AXStaticText', value='明天见', rect=(380.0, 321.0, 48.0, 16.0))]
         win = chat_window([row])
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
         self.assertEqual(msgs[0].text, '@缓缓 复活吧明天见')
 
     def test_walk_prune_finds_editor_under_many_offscreen_rows(self):
@@ -164,9 +164,9 @@ class ParseTests(unittest.TestCase):
                  message('可见三', 'them', 500.0)]
         win = chat_window(rows)
         ax = FakeAX()
-        ed = qq.find_editor(ax, win)
+        ed = ax_app.find_editor(ax, win)
         self.assertIsNotNone(ed)
-        self.assertEqual([m.text for m in qq.extract_messages(ax, win, ed)],
+        self.assertEqual([m.text for m in ax_app.extract_messages(ax, win, ed)],
                          ['可见一', '可见二', '可见三'])
 
     def test_quote_reply_block_is_excluded_from_body(self):
@@ -183,7 +183,7 @@ class ParseTests(unittest.TestCase):
             ]),
         ]
         win = chat_window([row])
-        msgs = qq.extract_messages(FakeAX(), win, qq.find_editor(FakeAX(), win))
+        msgs = ax_app.extract_messages(FakeAX(), win, ax_app.find_editor(FakeAX(), win))
         self.assertEqual([m.text for m in msgs], ['回复正文'])
 
     def test_nested_container_is_not_double_counted(self):
@@ -204,33 +204,33 @@ class ParseTests(unittest.TestCase):
             ]),
         ]
         win = chat_window([row])
-        msgs = qq.extract_messages(FakeAX(), win, qq.find_editor(FakeAX(), win))
+        msgs = ax_app.extract_messages(FakeAX(), win, ax_app.find_editor(FakeAX(), win))
         self.assertEqual([m.text for m in msgs], ['回复正文'])
 
     def test_messages_sorted_by_y_not_dom_order(self):
         # DFS 先遇到 y 大的行：结果仍须按 y 升序（顶部在前）
         ax = FakeAX()
         win = chat_window([message('低处', 'them', 500.0), message('高处', 'them', 300.0)])
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
         self.assertEqual([m.text for m in msgs], ['高处', '低处'])
         self.assertLess(msgs[0].y, msgs[1].y)
 
     def test_fingerprint_tracks_title_and_messages(self):
         ax = FakeAX()
         win = chat_window([message('在吗', 'them', 300.0)])
-        msgs = qq.extract_messages(ax, win, qq.find_editor(ax, win))
-        a = qq.fingerprint('王小姐', msgs)
-        self.assertEqual(a, qq.fingerprint('王小姐', msgs))
-        self.assertNotEqual(a, qq.fingerprint('李经理', msgs))
+        msgs = ax_app.extract_messages(ax, win, ax_app.find_editor(ax, win))
+        a = ax_app.fingerprint('王小姐', msgs)
+        self.assertEqual(a, ax_app.fingerprint('王小姐', msgs))
+        self.assertNotEqual(a, ax_app.fingerprint('李经理', msgs))
         win2 = chat_window([message('在吗', 'them', 300.0), message('在', 'me', 360.0)])
-        self.assertNotEqual(a, qq.fingerprint('王小姐', qq.extract_messages(ax, win2, qq.find_editor(ax, win2))))
+        self.assertNotEqual(a, ax_app.fingerprint('王小姐', ax_app.extract_messages(ax, win2, ax_app.find_editor(ax, win2))))
 
 
 class WindowTests(unittest.TestCase):
     def test_list_window_rejected_chat_window_chosen(self):
         chat = chat_window([])
         ax = FakeAX(windows=[list_window(), chat], focused=None)
-        win, ed = qq.chat_window(ax, 'app')
+        win, ed = ax_app.chat_window(ax, 'app')
         self.assertIs(win, chat)
         self.assertIsNotNone(ed)
 
@@ -238,17 +238,17 @@ class WindowTests(unittest.TestCase):
         small = chat_window([])
         big = chat_window([]); big.rect = (0.0, 0.0, 1500.0, 950.0)   # 放大窗口保持子树在其内
         ax = FakeAX(windows=[big, small], focused=small)
-        self.assertIs(qq.chat_window(ax, 'app')[0], small)
+        self.assertIs(ax_app.chat_window(ax, 'app')[0], small)
 
     def test_without_focus_largest_wins(self):
         small = chat_window([]); small.rect = (0.0, 0.0, 800.0, 600.0)
         big = chat_window([])
         ax = FakeAX(windows=[small, big], focused=list_window())
-        self.assertIs(qq.chat_window(ax, 'app')[0], big)
+        self.assertIs(ax_app.chat_window(ax, 'app')[0], big)
 
     def test_no_chat_window(self):
         ax = FakeAX(windows=[list_window()])
-        self.assertEqual(qq.chat_window(ax, 'app'), (None, None))
+        self.assertEqual(ax_app.chat_window(ax, 'app'), (None, None))
 
     def test_window_id_lookup_matches_pid_and_bounds(self):
         cg = [{'kCGWindowOwnerPID': 5, 'kCGWindowNumber': 42,
@@ -256,22 +256,22 @@ class WindowTests(unittest.TestCase):
               {'kCGWindowOwnerPID': 5, 'kCGWindowNumber': 7,
                'kCGWindowBounds': {'X': 599, 'Y': 260, 'Width': 369, 'Height': 580}}]
         with patch('Quartz.CGWindowListCopyWindowInfo', return_value=cg):
-            self.assertEqual(qq.window_id(5, WIN), 42)
-            self.assertEqual(qq.window_id(6, WIN), 0)
-            self.assertEqual(qq.window_id(5, (0, 0, 10, 10)), 0)
+            self.assertEqual(ax_app.window_id(5, WIN), 42)
+            self.assertEqual(ax_app.window_id(6, WIN), 0)
+            self.assertEqual(ax_app.window_id(5, (0, 0, 10, 10)), 0)
 
 
 class ReadConversationTests(unittest.TestCase):
     def setUp(self):
-        self.enterContext(patch.object(qq.fill, 'has_accessibility', return_value=True))
-        self.enterContext(patch.object(qq, 'qq_app', return_value=_FakeRunningApp(5)))
-        self.enterContext(patch.object(qq, 'app_element', return_value='app-el'))
-        self.enterContext(patch.object(qq, 'window_id', return_value=42))
+        self.enterContext(patch.object(ax_app.fill, 'has_accessibility', return_value=True))
+        self.enterContext(patch.object(ax_app, 'build_app', return_value=_FakeRunningApp(5)))
+        self.enterContext(patch.object(ax_app, 'app_element', return_value='app-el'))
+        self.enterContext(patch.object(ax_app, 'window_id', return_value=42))
 
     def test_reads_messages_title_window_and_input_rect(self):
         win = chat_window([message('在吗', 'them', 300.0), message('在', 'me', 360.0)])
         ax = FakeAX(windows=[list_window(), win], focused=win)
-        res = qq.read_conversation(ax=ax)
+        res = ax_app.read_conversation(ax=ax)
         self.assertTrue(res['ok']); self.assertFalse(res['unchanged'])
         self.assertEqual(res['chat_title'], '很难约的王小姐')
         self.assertEqual(res['window'], {'wid': 42, 'title': '很难约的王小姐', 'x': 311.0, 'y': 143.0, 'w': 1106.0, 'h': 782.0})
@@ -285,45 +285,45 @@ class ReadConversationTests(unittest.TestCase):
     def test_unchanged_short_circuit(self):
         win = chat_window([message('在吗', 'them', 300.0)])
         ax = FakeAX(windows=[win], focused=win)
-        first = qq.read_conversation(ax=ax)
-        again = qq.read_conversation(ax=ax, prev_fingerprint=first['fingerprint'], prev_layout=first['layout'])
+        first = ax_app.read_conversation(ax=ax)
+        again = ax_app.read_conversation(ax=ax, prev_fingerprint=first['fingerprint'], prev_layout=first['layout'])
         self.assertTrue(again['ok']); self.assertTrue(again['unchanged'])
         self.assertEqual(again['messages'], [])
         self.assertEqual(again['window'], first['window'])
-        resized = qq.read_conversation(ax=ax, prev_fingerprint=first['fingerprint'], prev_layout=(42, 900.0, 782.0))
+        resized = ax_app.read_conversation(ax=ax, prev_fingerprint=first['fingerprint'], prev_layout=(42, 900.0, 782.0))
         self.assertFalse(resized['unchanged'])
 
     def test_chat_window_editor_is_reused_no_second_find(self):
         # read_conversation 直接复用 chat_window 找到的编辑器，不对同一窗口二次 find_editor
         win = chat_window([message('在吗', 'them', 300.0)])
         ax = FakeAX(windows=[list_window(), win], focused=win)
-        with patch.object(qq, 'find_editor', wraps=qq.find_editor) as fe:
-            res = qq.read_conversation(ax=ax)
+        with patch.object(ax_app, 'find_editor', wraps=ax_app.find_editor) as fe:
+            res = ax_app.read_conversation(ax=ax)
         self.assertTrue(res['ok'])
         self.assertEqual(fe.call_count, 2)          # 每个窗口各一次（列表 + 聊天），仅此而已
         self.assertEqual(res['input_rect'], (311.0, 753.0, 1098.0, 169.0))
 
     def test_no_chat_window_error(self):
         ax = FakeAX(windows=[list_window()])
-        res = qq.read_conversation(ax=ax)
-        self.assertEqual((res['ok'], res['error'], res['messages']), (False, qq.ERR_NO_WINDOW, []))
+        res = ax_app.read_conversation(ax=ax)
+        self.assertEqual((res['ok'], res['error'], res['messages']), (False, ax_app.ERR_NO_WINDOW, []))
 
     def test_empty_tree_error_and_flag_reset(self):
         ax = FakeAX(windows=[])
-        with patch.object(qq, 'app_element') as ae:
-            res = qq.read_conversation(ax=ax)
-            self.assertEqual((res['ok'], res['error']), (False, qq.ERR_EMPTY_TREE))
+        with patch.object(ax_app, 'app_element') as ae:
+            res = ax_app.read_conversation(ax=ax)
+            self.assertEqual((res['ok'], res['error']), (False, ax_app.ERR_EMPTY_TREE))
             ae.assert_any_call(5, force=True)
 
     def test_no_accessibility(self):
-        with patch.object(qq.fill, 'has_accessibility', return_value=False):
-            res = qq.read_conversation(ax=FakeAX())
-            self.assertEqual((res['ok'], res['error']), (False, qq.fill.REASON_NO_ACCESS))
+        with patch.object(ax_app.fill, 'has_accessibility', return_value=False):
+            res = ax_app.read_conversation(ax=FakeAX())
+            self.assertEqual((res['ok'], res['error']), (False, ax_app.fill.REASON_NO_ACCESS))
 
     def test_no_qq_process(self):
-        with patch.object(qq, 'qq_app', return_value=None):
-            res = qq.read_conversation(ax=FakeAX())
-            self.assertEqual((res['ok'], res['error']), (False, qq.ERR_NO_APP))
+        with patch.object(ax_app, 'build_app', return_value=None):
+            res = ax_app.read_conversation(ax=FakeAX())
+            self.assertEqual((res['ok'], res['error']), (False, ax_app.ERR_NO_APP))
 
 
 class _FakeRunningApp:
@@ -338,57 +338,57 @@ class _FakeRunningApp:
 class FillTests(unittest.TestCase):
     def setUp(self):
         self.win = chat_window([])
-        self.editor = qq.find_editor(FakeAX(), self.win)
+        self.editor = ax_app.find_editor(FakeAX(), self.win)
         self.ax = FakeAX(windows=[self.win], focused=self.win)
-        self.enterContext(patch.object(qq.fill, 'has_accessibility', return_value=True))
-        self.enterContext(patch.object(qq, 'qq_app', return_value=_FakeRunningApp(5)))
-        self.enterContext(patch.object(qq, 'app_element', return_value='app-el'))
-        self.enterContext(patch.object(qq, '_LAST_FILL', None))
+        self.enterContext(patch.object(ax_app.fill, 'has_accessibility', return_value=True))
+        self.enterContext(patch.object(ax_app, 'build_app', return_value=_FakeRunningApp(5)))
+        self.enterContext(patch.object(ax_app, 'app_element', return_value='app-el'))
+        self.enterContext(patch.object(ax_app, '_LAST_FILL', None))
         self.window = {'wid': 42, 'x': 311.0, 'y': 143.0, 'w': 1106.0, 'h': 782.0}
 
     def test_locate_input_returns_editor_rect(self):
-        t = qq.locate_input(self.window, ax=self.ax)
+        t = ax_app.locate_input(self.window, ax=self.ax)
         self.assertIs(t['box'], self.editor)
         self.assertEqual(t['rect'], (311.0, 753.0, 1098.0, 169.0))
         self.assertEqual(t['reason'], '填入目标')
 
     def test_locate_input_without_permission_does_not_traverse(self):
-        with patch.object(qq.fill, 'has_accessibility', return_value=False), \
-             patch.object(qq, 'chat_window') as cw:
-            t = qq.locate_input(self.window, ax=self.ax)
-            self.assertIsNone(t['box']); self.assertEqual(t['reason'], qq.fill.REASON_NO_ACCESS)
+        with patch.object(ax_app.fill, 'has_accessibility', return_value=False), \
+             patch.object(ax_app, 'chat_window') as cw:
+            t = ax_app.locate_input(self.window, ax=self.ax)
+            self.assertIsNone(t['box']); self.assertEqual(t['reason'], ax_app.fill.REASON_NO_ACCESS)
             cw.assert_not_called()
 
     def test_locate_input_without_window_geometry(self):
         # 窗口字典缺几何键：返回未取得控件，而不是 KeyError
-        t = qq.locate_input({'wid': 42}, ax=self.ax)
+        t = ax_app.locate_input({'wid': 42}, ax=self.ax)
         self.assertIsNone(t['box'])
-        self.assertEqual(t['reason'], qq.REASON_NO_INPUT)
+        self.assertEqual(t['reason'], ax_app.REASON_NO_INPUT)
 
     def test_locate_input_rejects_editor_outside_window(self):
-        t = qq.locate_input(dict(self.window, x=0.0, y=0.0, w=100.0, h=100.0), ax=self.ax)
-        self.assertIsNone(t['box']); self.assertIn('不在当前 QQ 窗口内', t['reason'])
+        t = ax_app.locate_input(dict(self.window, x=0.0, y=0.0, w=100.0, h=100.0), ax=self.ax)
+        self.assertIsNone(t['box']); self.assertIn('不在当前聊天窗口内', t['reason'])
 
     def _fill(self, text, set_ok=True, landed=None, typed=(False, '')):
         """桩掉 AX 设值：设值「生效」后编辑器读回 landed；不碰真实 AX。"""
-        target = qq.locate_input(self.window, ax=self.ax)
+        target = ax_app.locate_input(self.window, ax=self.ax)
 
         def fake_set(box, value):
             if landed is not None:
                 box.value = landed
             return set_ok
 
-        with patch.object(qq.fill, '_ax_set_value', side_effect=fake_set) as setter, \
-             patch.object(qq, '_type_text', return_value=typed) as typer:
-            result = qq.fill_text(text, target=target, ax=self.ax)
+        with patch.object(ax_app.fill, '_ax_set_value', side_effect=fake_set) as setter, \
+             patch.object(ax_app, '_type_text', return_value=typed) as typer:
+            result = ax_app.fill_text(text, target=target, ax=self.ax)
         return result, setter, typer
 
     def test_readback_needs_change_not_substring(self):
         # 草稿「好的呀」已包含回复「好」：子串命中不算已填入，必须落到键盘后备
         self.editor.value = '好的呀'
-        (ok, reason), setter, typer = self._fill('好', landed='好的呀', typed=(False, qq.REASON_DRAFT))
+        (ok, reason), setter, typer = self._fill('好', landed='好的呀', typed=(False, ax_app.REASON_DRAFT))
         self.assertFalse(ok)
-        self.assertEqual(reason, qq.REASON_DRAFT)
+        self.assertEqual(reason, ax_app.REASON_DRAFT)
         typer.assert_called_once()
 
     def test_ax_write_into_empty_editor_and_verify(self):
@@ -409,48 +409,48 @@ class FillTests(unittest.TestCase):
         typer.assert_called_once()
 
     def test_changed_target_never_writes(self):
-        target = qq.locate_input(self.window, ax=self.ax)
+        target = ax_app.locate_input(self.window, ax=self.ax)
         other = editor(); other.rect = (311.0, 700.0, 1098.0, 222.0)
         self.win.children[0].children[-1].children = [other]
-        with patch.object(qq.fill, '_ax_set_value') as setter:
-            ok, reason = qq.fill_text('你好', target=target, ax=self.ax)
+        with patch.object(ax_app.fill, '_ax_set_value') as setter:
+            ok, reason = ax_app.fill_text('你好', target=target, ax=self.ax)
         self.assertFalse(ok); self.assertIn('目标已变化', reason); setter.assert_not_called()
 
     def test_double_click_is_ignored(self):
         self._fill('你好', landed='你好')
         (ok, reason), setter, _ = self._fill('你好', landed='你好')
-        self.assertFalse(ok); self.assertEqual(reason, qq.fill.REASON_DUPLICATE); setter.assert_not_called()
+        self.assertFalse(ok); self.assertEqual(reason, ax_app.fill.REASON_DUPLICATE); setter.assert_not_called()
 
     def test_unreadable_editor_stops_ax_fill(self):
         # 读不到编辑器内容时不能当成空编辑器盲写
         self.editor.value = None
-        target = qq.locate_input(self.window, ax=self.ax)
-        with patch.object(qq.fill, '_ax_set_value') as setter:
-            ok, reason = qq.fill_text('你好', target=target, ax=self.ax)
-        self.assertEqual((ok, reason), (False, qq.REASON_UNREADABLE))
+        target = ax_app.locate_input(self.window, ax=self.ax)
+        with patch.object(ax_app.fill, '_ax_set_value') as setter:
+            ok, reason = ax_app.fill_text('你好', target=target, ax=self.ax)
+        self.assertEqual((ok, reason), (False, ax_app.REASON_UNREADABLE))
         setter.assert_not_called()
 
     def test_unreadable_editor_stops_typing(self):
         self.editor.value = None
-        ok, reason = qq._type_text('你好', self.editor, _FakeRunningApp(5), self.ax)
-        self.assertEqual((ok, reason), (False, qq.REASON_UNREADABLE))
+        ok, reason = ax_app._type_text('你好', self.editor, _FakeRunningApp(5), self.ax)
+        self.assertEqual((ok, reason), (False, ax_app.REASON_UNREADABLE))
 
     def test_empty_text_and_missing_target(self):
-        self.assertEqual(qq.fill_text('  ', target=None, ax=self.ax), (False, qq.fill.REASON_EMPTY))
-        self.assertEqual(qq.fill_text('x', target=None, ax=self.ax), (False, qq.REASON_NO_INPUT))
+        self.assertEqual(ax_app.fill_text('  ', target=None, ax=self.ax), (False, ax_app.fill.REASON_EMPTY))
+        self.assertEqual(ax_app.fill_text('x', target=None, ax=self.ax), (False, ax_app.REASON_NO_INPUT))
 
     def test_typing_exception_is_caught_and_lock_released(self):
-        target = qq.locate_input(self.window, ax=self.ax)
-        with patch.object(qq.fill, '_ax_set_value', return_value=False), \
-             patch.object(qq, '_type_text', side_effect=RuntimeError('boom')):
-            ok, reason = qq.fill_text('你好', target=target, ax=self.ax)
+        target = ax_app.locate_input(self.window, ax=self.ax)
+        with patch.object(ax_app.fill, '_ax_set_value', return_value=False), \
+             patch.object(ax_app, '_type_text', side_effect=RuntimeError('boom')):
+            ok, reason = ax_app.fill_text('你好', target=target, ax=self.ax)
         self.assertEqual((ok, reason), (False, '输入过程异常，请先检查草稿，勿重复点击'))
-        self.assertFalse(qq._FILL_LOCK.locked())
+        self.assertFalse(ax_app._FILL_LOCK.locked())
 
     def test_typing_refuses_existing_draft(self):
         self.editor.value = '草稿'
-        ok, reason = qq._type_text('你好', self.editor, _FakeRunningApp(5), self.ax)
-        self.assertFalse(ok); self.assertEqual(reason, qq.REASON_DRAFT)
+        ok, reason = ax_app._type_text('你好', self.editor, _FakeRunningApp(5), self.ax)
+        self.assertFalse(ok); self.assertEqual(reason, ax_app.REASON_DRAFT)
 
 
 class TypeTextTests(unittest.TestCase):
@@ -460,7 +460,7 @@ class TypeTextTests(unittest.TestCase):
 
     def setUp(self):
         self.win = chat_window([])
-        self.editor = qq.find_editor(FakeAX(), self.win)
+        self.editor = ax_app.find_editor(FakeAX(), self.win)
         self.ax = FakeAX(windows=[self.win], focused=self.win)
         self.typed = []      # 每段在 key up 时记一次，模拟编辑器实际收到的内容
         self.chunks = []     # 每次 CGEventKeyboardSetUnicodeString 记一次（down/up 各一次）
@@ -483,15 +483,15 @@ class TypeTextTests(unittest.TestCase):
                 if drop_focus_after_chunk and len(self.typed) == drop_focus_after_chunk:
                     front._pid = 999            # 下一段发出前焦点丢失
 
-        with patch.object(qq.AppKit, 'NSWorkspace', ws), \
-             patch.object(qq.fill, '_ax_attr', return_value=focused), \
-             patch.object(qq.AS, 'AXUIElementSetAttributeValue', lambda *a: 0), \
-             patch.object(qq.Quartz, 'CGEventCreateKeyboardEvent', fake_create), \
-             patch.object(qq.Quartz, 'CGEventSetFlags', lambda ev, flags: None), \
-             patch.object(qq.Quartz, 'CGEventKeyboardSetUnicodeString', fake_unicode), \
-             patch.object(qq.Quartz, 'CGEventPost', lambda tap, ev: None), \
-             patch.object(qq.time, 'sleep', lambda s: None):
-            return qq._type_text(text, self.editor, _FakeRunningApp(5), self.ax)
+        with patch.object(ax_app.AppKit, 'NSWorkspace', ws), \
+             patch.object(ax_app.fill, '_ax_attr', return_value=focused), \
+             patch.object(ax_app.AS, 'AXUIElementSetAttributeValue', lambda *a: 0), \
+             patch.object(ax_app.Quartz, 'CGEventCreateKeyboardEvent', fake_create), \
+             patch.object(ax_app.Quartz, 'CGEventSetFlags', lambda ev, flags: None), \
+             patch.object(ax_app.Quartz, 'CGEventKeyboardSetUnicodeString', fake_unicode), \
+             patch.object(ax_app.Quartz, 'CGEventPost', lambda tap, ev: None), \
+             patch.object(ax_app.time, 'sleep', lambda s: None):
+            return ax_app._type_text(text, self.editor, _FakeRunningApp(5), self.ax)
 
     def test_success_types_chunks_and_verifies(self):
         result = self._type('一二三四五' * 6)          # 30 字 → 20 + 10 两段
@@ -513,12 +513,12 @@ class TypeTextTests(unittest.TestCase):
 
     def test_refuses_when_frontmost_is_not_qq(self):
         result = self._type('你好', front=_FakeRunningApp(999))
-        self.assertEqual(result, (False, 'QQ 没有获得焦点，请先点 QQ 输入区再重试'))
+        self.assertEqual(result, (False, '聊天应用没有获得焦点，请先点聊天输入区再重试'))
         self.assertEqual(self.chunks, [])
 
     def test_refuses_when_editor_not_focused(self):
         result = self._type('你好', focused=False)
-        self.assertEqual(result, (False, '输入框未获得焦点，请先点 QQ 输入区再重试'))
+        self.assertEqual(result, (False, '输入框未获得焦点，请先点聊天输入区再重试'))
         self.assertEqual(self.chunks, [])
 
     def test_stops_when_focus_lost_mid_typing(self):
@@ -537,13 +537,13 @@ class TypeTextTests(unittest.TestCase):
 
 
 class ProbeScriptTests(unittest.TestCase):
-    """probe/qq_ax_probe.py 的两处独立缺陷：walk 计数器可变默认值、--fill 缺参数。"""
+    """probe/ax_probe.py 的两处独立缺陷：walk 计数器可变默认值、--fill 缺参数。"""
 
     @staticmethod
     def _probe():
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            'qq_ax_probe', ROOT / 'probe' / 'qq_ax_probe.py')
+            'ax_probe', ROOT / 'probe' / 'ax_probe.py')
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod

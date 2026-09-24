@@ -4,9 +4,9 @@ import Quartz
 
 
 def input_outline(image):
-    """Find the long separator above WeChat's message composer.
+    """Find the long separator above the chat app's message composer.
 
-    Older WeChat builds draw a closed rectangle around the composer. WeChat 4.x draws
+    Older builds draw a closed rectangle around the composer. Current 4.x draws
     only its top separator and left divider because the composer ends at the window
     bottom. Accept either shape, but only let an open-bottom separator qualify when it
     reaches the right window edge. Coordinates are normalized top-origin; no fixed
@@ -47,7 +47,7 @@ def input_outline(image):
     bottoms = [(by, bl, br) for by,bl,br in rows
                if by > max(y+20,h*.90) and abs(bl-left)<12 and abs(br-right)<12]
     if not bottoms:
-        # WeChat 4.x has no lower stroke: the input panel simply continues to the
+        # Current 4.x has no lower stroke: the input panel simply continues to the
         # bottom of the window. Requiring the detected separator to touch the right
         # edge keeps message bubbles and other internal rules from becoming targets.
         if right < w-12 or h-y < max(20,h*.08):

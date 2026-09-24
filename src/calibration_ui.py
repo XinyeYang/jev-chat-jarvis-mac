@@ -1,4 +1,4 @@
-"""Native calibration on a frozen WeChat window snapshot; preview never calls models."""
+"""Native calibration on a frozen chat window snapshot; preview never calls models."""
 import threading
 import tempfile
 from pathlib import Path
@@ -94,14 +94,14 @@ class SelectionView(A.NSView):
 
 class CalibrationController(NSObject):
     @objc.python_method
-    # 纯原生窗口装配：依赖真微信窗口/截图权限，离线回归只测文案常量与
+    # 纯原生窗口装配：依赖真聊天窗口/截图权限，离线回归只测文案常量与
     # 交互逻辑（见 tests/test_calibration_ui_copy.py），装配体本身不测。
     def build(self, callback, saved='', image=None, win=None, saved_input=''):  # pragma: no cover
         self.mode = 'messages'
         self.regions = {'messages': None, 'input': None}
         self.callback=callback; self.busy=False; self.preview=None; self.closed=False
         self.win=win or find_wechat_window()
-        if self.win is None: raise ValueError('请先打开微信聊天窗口。')
+        if self.win is None: raise ValueError('请先打开聊天窗口。')
         self.image=image if image is not None else capture_image(self.win.wid)
         if self.image is None:
             with tempfile.TemporaryDirectory() as d:
@@ -109,7 +109,7 @@ class CalibrationController(NSObject):
                 if capture_window(self.win.wid,path):
                     source=Q.CGImageSourceCreateWithURL(NSURL.fileURLWithPath_(str(path)),None)
                     self.image=Q.CGImageSourceCreateImageAtIndex(source,0,None) if source else None
-        if self.image is None: raise ValueError('无法读取微信窗口，请检查屏幕录制权限。')
+        if self.image is None: raise ValueError('无法读取聊天窗口，请检查屏幕录制权限。')
         self.path=userconfig.env_files()[0]
         self.original=read_document(self.path)
         palette = ui_style.PALETTE
@@ -156,7 +156,7 @@ class CalibrationController(NSObject):
         self.canvas=SelectionView.alloc().initWithFrame_(NSMakeRect((width-cw)/2,124,cw,ch))
         self.canvas.picture=A.NSImage.alloc().initWithCGImage_size_(self.image,(cw,ch))
         self.canvas.owner=self;self.canvas.selection=None;self.canvas.messages=[]
-        self.canvas.setAccessibilityLabel_('微信窗口截图，拖动框选区域，拖动边缘调整')
+        self.canvas.setAccessibilityLabel_('聊天窗口截图，拖动框选区域，拖动边缘调整')
         view.addSubview_(self.canvas)
         for key,value in (('messages',saved),('input',saved_input)):
             if value:
@@ -253,7 +253,7 @@ class CalibrationController(NSObject):
         if self.preview is None or self.busy:return
         current=find_wechat_window(self.win.wid)
         if current is None or current.wid!=self.win.wid or not self.preview[0].matches(current):
-            self.status.setStringValue_('微信窗口已改变，请取消后重新校准。');return
+            self.status.setStringValue_('聊天窗口已改变，请取消后重新校准。');return
         try:
             write_settings(self.path,self.original,{'JEV_MESSAGE_REGION':self.preview[0].serialize(),
                                                      'JEV_INPUT_REGION':self.preview[1].serialize()})

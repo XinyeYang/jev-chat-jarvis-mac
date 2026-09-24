@@ -2,8 +2,8 @@
 """QQ AX 探测：打印 QQNT 聊天窗口无障碍树里的消息容器、DOM class、方向与输入框。
 
 用法（QQ 聊天窗口在屏幕上时）：
-    uv run python probe/qq_ax_probe.py            # 只读：窗口、输入框、消息
-    uv run python probe/qq_ax_probe.py --fill 你好  # 另外试一次 AX 设值并读回（输入框须为空）
+    uv run python probe/ax_probe.py            # 只读：窗口、输入框、消息
+    uv run python probe/ax_probe.py --fill 你好  # 另外试一次 AX 设值并读回（输入框须为空）
 
 不发送、不点按键、不用剪贴板。--fill 只在输入框为空时写入，之后你自己删掉即可。
 """
@@ -61,7 +61,7 @@ def fill_arg(argv):
 def main():
     fill_text, usage_ok = fill_arg(sys.argv)
     if not usage_ok:
-        print("用法: qq_ax_probe.py [--fill 文本]  （--fill 需要跟一个文本参数）")
+        print("用法: ax_probe.py [--fill 文本]  （--fill 需要跟一个文本参数）")
         return 2
     print("AX trusted:", AS.AXIsProcessTrusted())
     apps = AppKit.NSRunningApplication.runningApplicationsWithBundleIdentifier_("com.tencent.qq")

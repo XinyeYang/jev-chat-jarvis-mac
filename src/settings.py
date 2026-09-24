@@ -162,7 +162,7 @@ class SettingsController(NSObject):
         priority_surface.setFrame_(NSMakeRect(24, 74, 710, 44))
         view.addSubview_(priority_surface)
         self.label(view, "优先级：环境变量 > 用户 env > 项目 .env > 内置；两组生成密钥同时存在时 OpenAI 优先。\n清空此文件的密钥不屏蔽其他来源；切换服务需清除原来源中的优先密钥。", 36, 80, 686, 32, 11, PALETTE["muted"])
-        self.status = self.label(view, "测试会发送固定问候语，不读取微信内容；可能产生少量服务费用。", 24, 26, 550, 38, 11, PALETTE["muted"])
+        self.status = self.label(view, "测试会发送固定问候语，不读取聊天内容；可能产生少量服务费用。", 24, 26, 550, 38, 11, PALETTE["muted"])
         self.set_status(self.status.stringValue())
         self.save_button = self.button(view, "保存配置", "saveSettings:", 602, 29, 132, True)
         self.controls.append(self.save_button)

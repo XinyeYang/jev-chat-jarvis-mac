@@ -1,4 +1,4 @@
-"""QQ 适配器：通过系统无障碍（AX）树读 QQNT（Electron）聊天窗口，不截图、不 OCR。
+"""文本接口路径适配器：通过系统无障碍（AX）树读目标（Electron 架构）聊天窗口，不截图、不 OCR。
 
 实测事实（2026-09-23，QQ 6.9.96）见 docs/superpowers/specs/2026-09-23-qq-adapter-design.md
 第 2 节：Electron 在设 AXManualAccessibility 后暴露完整树并附带 AXDOMClassList；消息容器
@@ -21,7 +21,7 @@ import AppKit
 import ApplicationServices as AS
 import Quartz
 
-if __name__ == "__main__" and not __package__:   # CLI 自测：python src/apps/qq.py 时把 src/ 挂进 path
+if __name__ == "__main__" and not __package__:   # CLI 自测：python src/apps/ax_app.py 时把 src/ 挂进 path
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import fill
@@ -29,7 +29,7 @@ from perception import Message, WindowInfo
 from visual_fill import plain_text
 
 KEY = "qq"
-DISPLAY_NAME = "QQ"
+DISPLAY_NAME = "聊天工具"
 BUNDLE_IDS = ("com.tencent.qq",)
 APP_NAMES = ("QQ",)
 
@@ -40,17 +40,17 @@ AVATAR_CLASS = "avatar-span"
 MAX_NODES = 3000        # 一次遍历的节点上限：一个繁忙群聊每条可见消息约 8 个节点
 MAX_MESSAGES = 12
 
-ERR_NO_APP = "没找到 QQ 应用"
-ERR_NO_WINDOW = "QQ 聊天窗口未找到"
-ERR_EMPTY_TREE = "QQ 无障碍树为空，请重启 QQ 后重试"
+ERR_NO_APP = "没找到目标应用"
+ERR_NO_WINDOW = "聊天窗口未找到"
+ERR_EMPTY_TREE = "界面树为空，请重启应用后重试"
 
-REASON_NO_INPUT = "未取得可用的 QQ 输入控件"
+REASON_NO_INPUT = "未取得可用的聊天输入控件"
 REASON_DRAFT = "输入区已有草稿；请使用复制手动插入，避免改动现有内容"
 REASON_UNREADABLE = "无法读取输入区，已停止填入"
 
 
 class AXReader:
-    """AX 属性读取的最小接口；测试用同名方法的内存树替换（tests/test_qq_adapter.py）。"""
+    """AX 属性读取的最小接口；测试用同名方法的内存树替换（tests/test_ax_adapter.py）。"""
 
     def _str(self, el, name) -> str:
         v = fill._ax_attr(el, name)
@@ -229,8 +229,8 @@ def fingerprint(title: str, msgs: list[Message]) -> bytes:
 
 # ------------------------------------------------------------------ 进程与窗口
 
-def qq_app():
-    """运行中的 QQ：bundle id 优先，显示名兜底；没有则 None。"""
+def build_app():
+    """运行中的目标应用：bundle id 优先，显示名兜底；没有则 None。"""
     try:
         apps = AppKit.NSRunningApplication.runningApplicationsWithBundleIdentifier_(BUNDLE_IDS[0])
         if apps and len(apps) > 0:
@@ -304,9 +304,9 @@ def window_id(pid: int, rect) -> int:
 
 
 def find_window(previous_wid=None, ax=None) -> WindowInfo | None:
-    """当前 QQ 聊天窗口（previous_wid 只为接口对齐：焦点窗口优先于粘住旧窗口）。"""
+    """当前聊天窗口（previous_wid 只为接口对齐：焦点窗口优先于粘住旧窗口）。"""
     ax = ax or AXReader()
-    app = qq_app()
+    app = build_app()
     if app is None:
         return None
     pid = app.processIdentifier()
@@ -327,7 +327,7 @@ def read_conversation(max_messages: int = MAX_MESSAGES, previous_wid=None,
     ax = ax or AXReader()
     if not fill.has_accessibility():
         return {"ok": False, "error": fill.REASON_NO_ACCESS, "messages": []}
-    app = qq_app()
+    app = build_app()
     if app is None:
         return {"ok": False, "error": ERR_NO_APP, "messages": []}
     pid = app.processIdentifier()
@@ -365,7 +365,7 @@ def locate_input(win: dict, ax=None) -> dict:
         result["reason"] = fill.REASON_NO_ACCESS
         return result
     ax = ax or AXReader()
-    app = qq_app()
+    app = build_app()
     if app is None:
         result["reason"] = ERR_NO_APP
         return result
@@ -381,7 +381,7 @@ def locate_input(win: dict, ax=None) -> dict:
         return result                        # 缺几何键：无从比对，视同未取得控件
     bounds = tuple(float(v) for v in vals)
     if not _inside(rect, bounds):
-        result["reason"] = "输入控件不在当前 QQ 窗口内"
+        result["reason"] = "输入控件不在当前聊天窗口内"
         return result
     result.update(box=editor, rect=tuple(rect), reason="填入目标")
     return result
@@ -404,7 +404,7 @@ def _landed(before: str, after: str, text: str) -> bool:
 
 
 def fill_text(text: str, target=None, ax=None) -> tuple[bool, str]:
-    """把候选写进 QQ 输入框：AX 设值优先并读回校验；ProseMirror 拒收时退到键盘事件。
+    """把候选写进聊天输入框：AX 设值优先并读回校验；ProseMirror 拒收时退到键盘事件。
     不发送、不用剪贴板、失败不自动重试。"""
     global _LAST_FILL
     text = (text or "").strip()
@@ -416,7 +416,7 @@ def fill_text(text: str, target=None, ax=None) -> tuple[bool, str]:
         if not fill.has_accessibility():
             return False, fill.REASON_NO_ACCESS
         ax = ax or AXReader()
-        app = qq_app()
+        app = build_app()
         if app is None:
             return False, ERR_NO_APP
         if target is None or target.get("box") is None:
@@ -464,7 +464,7 @@ def _utf16_chunks(text: str, size: int = 20) -> list[str]:
 
 
 def _type_text(text: str, editor, app, ax) -> tuple[bool, str]:
-    """键盘事件后备：AX 置焦编辑器、激活 QQ、按 20 个 UTF-16 单元一段发 Unicode 键入事件，
+    """键盘事件后备：AX 置焦编辑器、激活目标应用、按 20 个 UTF-16 单元一段发 Unicode 键入事件，
     每段发出前复查前台与编辑器焦点，最后读回校验（变化 + 结尾）。
     已有草稿时停止（不覆盖、不追加），永远不按回车。"""
     before = ax.value_or_none(editor)
@@ -480,9 +480,9 @@ def _type_text(text: str, editor, app, ax) -> tuple[bool, str]:
     time.sleep(0.15)
     front = AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
     if front is None or front.processIdentifier() != app.processIdentifier():
-        return False, "QQ 没有获得焦点，请先点 QQ 输入区再重试"
+        return False, "聊天应用没有获得焦点，请先点聊天输入区再重试"
     if not fill._ax_attr(editor, AS.kAXFocusedAttribute):
-        return False, "输入框未获得焦点，请先点 QQ 输入区再重试"
+        return False, "输入框未获得焦点，请先点聊天输入区再重试"
     plain = plain_text(text)
     if not plain.strip():
         return False, fill.REASON_EMPTY
@@ -507,7 +507,7 @@ def _type_text(text: str, editor, app, ax) -> tuple[bool, str]:
     return False, "已尝试输入，未能确认；请检查草稿，勿重复点击"
 
 
-class QQApp:
+class AXApp:
     key = KEY
     display_name = DISPLAY_NAME
     bundle_ids = BUNDLE_IDS

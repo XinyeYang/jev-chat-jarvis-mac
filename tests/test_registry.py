@@ -12,19 +12,19 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 
 
-class WeChatAppTests(unittest.TestCase):
+class CaptureAppTests(unittest.TestCase):
     def test_identity(self):
-        from apps.wechat import WeChatApp
-        app = WeChatApp()
+        from apps.capture_app import CaptureApp
+        app = CaptureApp()
         self.assertEqual(app.key, 'wechat')
-        self.assertEqual(app.display_name, '微信')
+        self.assertEqual(app.display_name, '聊天应用')
         self.assertIn('com.tencent.xinWeChat', app.bundle_ids)
         self.assertIn('微信', app.app_names)
         self.assertTrue(app.needs_screen_capture)
 
     def test_delegates_to_perception_and_fill(self):
-        from apps.wechat import WeChatApp
-        app = WeChatApp()
+        from apps.capture_app import CaptureApp
+        app = CaptureApp()
         with patch('perception.find_wechat_window', return_value='win') as fw, \
              patch('perception.read_conversation', return_value={'ok': True}) as rc, \
              patch('fill.locate_input', return_value={'box': None}) as li, \
@@ -83,7 +83,7 @@ class RegistryTests(unittest.TestCase):
 
     def test_app_by_key(self):
         from apps import registry
-        self.assertEqual(registry.app_by_key('qq').display_name, 'QQ')
+        self.assertEqual(registry.app_by_key('qq').display_name, '聊天工具')
         self.assertIsNone(registry.app_by_key('feishu'))
         self.assertEqual([a.key for a in registry.APPS], ['wechat', 'qq'])
 

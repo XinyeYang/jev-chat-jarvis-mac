@@ -6,11 +6,11 @@ frontmost_app() 三种返回值必须区分：某个适配器（在聊天 App �
 """
 from __future__ import annotations
 
-from apps.qq import QQApp
-from apps.wechat import WeChatApp
+from apps.ax_app import AXApp
+from apps.capture_app import CaptureApp
 
 UNKNOWN = object()          # 前台查询失败的哨兵；`is` 比较
-APPS = (WeChatApp(), QQApp())
+APPS = (CaptureApp(), AXApp())
 
 
 def _frontmost():
@@ -26,7 +26,7 @@ def _frontmost():
 
 
 def match(bundle: str, name: str):
-    """先按 bundle id、再按显示名精确匹配（精确：微信读书 / QQ音乐 不算）。"""
+    """先按 bundle id、再按显示名精确匹配——名字相近的兄弟应用不算。"""
     for app in APPS:
         if bundle and bundle in app.bundle_ids:
             return app

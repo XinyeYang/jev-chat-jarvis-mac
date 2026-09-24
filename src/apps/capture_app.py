@@ -1,13 +1,13 @@
-"""微信适配器：薄封装，全部转调 perception / fill，不改任何识别逻辑。"""
+"""截图路径适配器：薄封装，全部转调 perception / fill，不改任何识别逻辑。"""
 from __future__ import annotations
 
 import fill
 import perception
 
 
-class WeChatApp:
+class CaptureApp:
     key = "wechat"
-    display_name = "微信"
+    display_name = "聊天应用"
     bundle_ids = (fill.WECHAT_BUNDLE_ID,)
     app_names = perception.WECHAT_APP_NAMES
     needs_screen_capture = True
