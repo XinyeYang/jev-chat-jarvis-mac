@@ -216,6 +216,7 @@ Copyright © 2026 eatmoreduck 与 jev-chat 贡献者。代码以 MIT 协议开�
 
 <table>
   <tr>
+    <td align="center"><img src="docs/wechat-group-2.png" width="200" alt="扫码加入微信交流群 2 群"><br><sub>2 群</sub></td>
     <td align="center"><img src="docs/wechat-group-3.png" width="200" alt="扫码加入微信交流群 3 群"><br><sub>3 群</sub></td>
     <td align="center"><img src="docs/wechat-group-4.png" width="200" alt="扫码加入微信交流群 4 群"><br><sub>4 群</sub></td>
     <td align="center"><img src="docs/wechat-group-5.png" width="200" alt="扫码加入微信交流群 5 群"><br><sub>5 群</sub></td>
