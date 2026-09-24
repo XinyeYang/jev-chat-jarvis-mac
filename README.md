@@ -14,7 +14,7 @@
 
 | 平台 | 状态 | 采集方式 | 需要的权限 | 备注 |
 |---|---|---|---|---|
-| QQ macOS 6.9.x（QQNT） | ✅ | 系统无障碍树直接读结构化节点 | 辅助功能（读 + 填入） | 不截图、不 OCR；我方 / 对方按节点 class 判定 |
+| QQ macOS 6.9.x（QQNT） | ✅ | 系统文本接口直读（无截图） | 辅助功能（读 + 填入） | 不截图、不 OCR；消息方向按界面样式判定 |
 
 悬浮窗跟随当前在前台的那个应用，共用同一套判断、生成与悬浮窗。
 
@@ -190,7 +190,7 @@ chmod 600 ~/.config/jev-jarvis/env
 - **贡献前必读**：[CONTRIBUTING.md](CONTRIBUTING.md)——动代码前先在 issue 认领（评论 + assignee），分层自测改哪层跑哪层
 - 配置界面自测：`uv run python -B -m unittest discover -s tests`；macOS 原生窗口与按钮流程：`uv run python -B probe/settings_smoke.py`（临时配置 + 本地测试服务，不使用个人密钥）。
 - 打包 `./packaging/build_app.sh`；发版 `./packaging/release.sh --publish`（干净 worktree 构建 + 解压回验 + gh release）。版本号只有 `pyproject.toml` 一处；有开发者证书可加 `--sign "Developer ID Application: ..."`
-- 架构一句话：截图型聊天应用在前台时，通过带超时的 `screencapture` 子进程抓其窗口 → Vision OCR（只扫聊天区）；结构化聊天应用在前台时，读其无障碍树 → 同一条管线：本地 decider-2b 出意图/风险 → LLM 并发出候选 → 本地排序 → 悬浮窗 NSPanel。底层仍按窗口 ID 抓取而不是全屏截图，悬浮窗不污染 OCR
+- 架构一句话：截图型聊天应用在前台时，通过带超时的 `screencapture` 子进程抓其窗口 → Vision OCR（只扫聊天区）；文本接口型聊天应用在前台时，直读其界面文本 → 同一条管线：本地 decider-2b 出意图/风险 → LLM 并发出候选 → 本地排序 → 悬浮窗 NSPanel。底层仍按窗口 ID 抓取而不是全屏截图，悬浮窗不污染 OCR
 
 ## 版权与许可
 
