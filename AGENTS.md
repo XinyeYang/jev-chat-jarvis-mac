@@ -16,7 +16,7 @@
   ```
 
 - 日志：`~/Library/Logs/jev-jarvis.log`，分阶段耗时（读屏/判断/生成/排序/端到端）。**刻意不含消息正文与候选文字**（用户可放心贴 issue），只在事件发生时打、不在每跳打；首次调用标注「首次」。
-- 发版：版本号只有 `pyproject.toml` 一处；两条等价路径——推 tag（`git tag vX.Y.Z && git push origin vX.Y.Z`，须与 pyproject 版本一致，Release workflow 在 CI 自动构建+发布）或本地 `./packaging/release.sh --publish` 从**干净 worktree** 构建（zip 解压回验+SHA256+gh release）；无 Apple 公证，首次打开要教右键。资产命名统一 `jev-jarvis-macos-` 前缀：版本包 `jev-jarvis-macos-v<版本>.zip`、稳定名 `jev-jarvis-macos-latest.zip`（README 下载链接靠它，改名必须三处同步：release.sh + README + 当期 release notes）。公告草稿：Release Drafter 随 master push 自动按 PR 标签维护 draft，发版时对照校对。
+- 发版：版本号只有 `pyproject.toml` 一处；两条等价路径——推 tag（`git tag vX.Y.Z && git push origin vX.Y.Z`，须与 pyproject 版本一致，Release workflow 在 CI 自动构建+发布）或本地 `./packaging/release.sh --publish` 从**干净 worktree** 构建（zip 解压回验+SHA256+gh release）；无 Apple 公证，首次打开要教右键。资产命名统一 `jev-jarvis-macos-` 前缀：版本包 `jev-jarvis-macos-v<版本>.zip`、稳定名 `jev-jarvis-macos-latest.zip`（README 下载链接靠它，改名必须三处同步：release.sh + README + 当期 release notes）。公告草稿：Release Drafter 随 master push 自动按 PR 标签维护 draft，发版时对照校对（draft 实际可能不存在，#121 发版日实测——缺失就手写）。**发版前必核验 README 口径**：当版用户可见行为/数字的变化逐项同步进 README（功能描述、平台支持表、话术数量、已知限制、下一步清单），过时措辞（如「fork 实验分支」「本分支」「个人截图不随代码提交」这类时效句）当版清掉；公告两件套 `docs/release-notes-vX.Y.Z.md`（GitHub Release 正文源，图用相对路径，发 release 时换 raw 链接）+ `docs/wechat-mp-post-vX.Y.Z.md`（公众号图文稿）随发版产出，口径以核对后的 README 为准，不另编数字。
 - 认领协议：动任何 issue 的代码前，先按 [CONTRIBUTING.md](CONTRIBUTING.md) 完成认领三步自检 + 评论认领 + 设 assignee——多人多 AI 并行扫 issue，不认领必撞车。
 
 ## 架构与硬约束
