@@ -45,7 +45,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/jev-jarvis.app
 
 ## 启动后悬浮窗一片空白、没有任何提示？
 
-这是**旧版本**的现象：新版本首次启动会弹出判断方式引导，模型下载/加载期间面板状态行有实时进度（如「下载判断模型 34% · 1.2/3.8 GB」），失败也有红字说明。遇到一片白先确认版本，**推荐更新到[最新版](https://github.com/jev-chat/jev-chat-jarvis-mac/releases/latest)**。新版本发布会在微信群与公众号通知，入口见 README 文末[「交流反馈」](../README.md#交流反馈)，建议关注以便第一时间收到更新。
+这是**旧版本**的现象：新版本首次启动会弹出判断方式引导，模型下载/加载期间面板状态行有实时进度（如「下载判断模型 34% · 1.2/3.8 GB」），失败也有红字说明。遇到一片白先确认版本，**推荐更新到[最新版](https://github.com/jev-chat/jev-chat-jarvis-mac/releases/latest)**。新版本发布请关注 GitHub Releases，建议 Watch 仓库以便第一时间收到更新。
 
 ## 还有问题？
 
